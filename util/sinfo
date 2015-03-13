@@ -1,0 +1,1589 @@
+#!/usr/bin/env perl
+
+BEGIN {
+  my $inc = "./lib"; 
+  push @INC, @inc;
+};
+
+use warnings;
+use strict;
+use utf8;
+use JSON;
+use POSIX;
+use File::Spec::Functions qw(rel2abs);
+use File::Basename qw(dirname);
+
+# use Smart::Comments;
+binmode(STDIN, ":encoding(utf8)");
+binmode(STDOUT, ":encoding(utf8)");
+binmode(STDERR, ":encoding(utf8)");
+
+$| = 1;
+
+# get epinfo path
+our $filename = (split /\//, __FILE__)[-1];
+our $dirname  = dirname(rel2abs(__FILE__));
+our $epinfo = $dirname . '/ep/epinfo';
+
+# Set Global Config {data_config}
+# set what information to collect
+our %data_config = (
+
+  # original system_dyninfo
+  'sysload'		=> 1,
+  'systime'		=> 1,
+  'mem_usage'		=> 1,
+  'process'		=> 1,
+  'netstat'		=> 1,
+  'disk_space'		=> 1,
+
+  # new added
+  'process_top'		=> 1,
+
+  # original system_fixinfo
+  'product_info'	=> 1,
+  'mem_info'		=> 1,		# infact, this config is unless, mem_info depend on (same as) product_info
+  'cpu_info'		=> 1,
+  'os_info'		=> 1,
+  'sys_clock'		=> 1,
+  'selinux'		=> 1,
+  'supuser'		=> 1,
+  'runlevel'		=> 1,
+  'startups'		=> 1,
+  'dns'			=> 1,
+  'mount'		=> 1,
+  'inet_name'		=> 1,
+  'raid_info'		=> 1,
+);
+## %data_config
+
+
+#
+# === Global Sub Def START
+#
+
+# get os bitmode
+sub get_osbitmode {
+  my $osbit = '32';
+  my $getconf = "/usr/bin/getconf";
+  if (-f $getconf && -x $getconf) {
+          open my $fh, "$getconf LONG_BIT 2>&- |";
+          if ($fh) {
+                while(<$fh>){
+                        chomp; s/\A\s*//; s/\s*\Z//g; $osbit = $_;
+                }    
+          }    
+  }
+  return $osbit;
+}
+
+# get os runlevel
+sub get_runlevel {
+  my $level = 'X';
+  my $inittab = '/etc/inittab';
+  if (-f $inittab && -r $inittab) {
+        if(open my $fh, "<", $inittab){
+                while(<$fh>){
+                        chomp; s/(\A\s+|\s+\Z)//g;
+                        if (m/\A\s*id:/){
+                                $level = (split /:/)[1];
+                                last;
+                        }
+                }
+                close $fh;
+        }
+  }
+  return $level;
+}
+
+# convert as Kib
+sub c2kb {
+        my $size = shift;
+
+        unless (defined $size) {
+                return undef;
+        }
+
+        # match 1.1 / 0.2 / .125 / 100 ...
+        unless ($size =~ m/\A\s*((\d*)(\.?)(\d+))\s*(K|KB|M|MB|G|GB|T|TB|P|PB|E|EB|Z|ZB|Y|YB)\Z/i) {
+                return $size;
+        }
+
+        my ($number, $unit) = ($1, $5);
+        if ($unit =~ /\AK/i) {
+                return $number;
+        } elsif ($unit =~ /\AM/i) {
+                return $number * 1024;
+        } elsif ($unit =~ /\AG/i) {
+                return $number * 1024 * 1024;
+        } elsif ($unit =~ /\AT/i) {
+                return $number * 1024 * 1024 * 1024;
+        } elsif ($unit =~ /\AP/i ) {
+                return $number * 1024 * 1024 * 1024 * 1024;
+        } elsif ($unit =~ /\AE/i ) {
+                return $number * 1024 * 1024 * 1024 * 1024 * 1024;
+        } elsif ($unit =~ /\AZ/i ) {
+                return $number * 1024 * 1024 * 1024 * 1024 * 1024 * 1024;
+        } elsif ($unit =~ /\AY/i ) {
+                return $number * 1024 * 1024 * 1024 * 1024 * 1024 * 1024 * 1024;
+        } else {
+                return $size;
+        }
+}
+
+#
+# === Global Sub Def END 
+#
+
+
+# set $OS_RUNLEVEL / $OS_BITMODE 
+our $OS_RUNLEVEL = &get_runlevel;
+our $OS_BITMODE  = &get_osbitmode;
+
+
+# init set %result hash
+our %result = ();
+
+
+#
+#  BEGIN to COLLECT SYSTEM INFORMATION 
+#
+
+
+##
+##  part_1. system dyninfo
+##
+
+# sysload
+if ($data_config{'sysload'}) {
+  my %sysload= (
+  	'1min'	=> '',
+  	'5min'	=> '',
+  	'15min'	=> '',
+  );
+  my $load_file = '/proc/loadavg';
+  if (-f $load_file && -r $load_file) {
+  	if (open my $fh, "<", $load_file) {
+        	my ($load1,$load5,$load15) = ('','','');
+        	while(<$fh>){
+			($load1,$load5,$load15) = (split/\s+/)[0,1,2];
+			last;
+		}
+		$sysload{'1min'} = $load1;
+		$sysload{'5min'} = $load5;
+		$sysload{'15min'} = $load15;
+		close $fh if $fh;
+  	}
+  }
+  ### %sysload
+  $result{'sysload'} = \%sysload;
+}
+
+# systime
+if ($data_config{'systime'}) {
+  my %systime = (
+  	'systime'	=> time,
+  	'boottime'	=> '',
+  	'runtime'	=> '',
+  	'idletime'	=> '',
+  	'idlerate'	=> '',
+  );
+  my $stat_file = '/proc/stat';
+  my $uptm_file = '/proc/uptime';
+  my $cpu_file = '/proc/cpuinfo';
+  if (-f $stat_file && -r $stat_file) {
+  	if (open my $fh, "<", $stat_file) {
+		while(<$fh>){
+			if (m/\A\s*btime\s+(\d+)/i) {
+				$systime{'boottime'} = $1;
+				last;
+			}
+  		}
+		close $fh if $fh;
+  	}
+  }
+  if (-f $uptm_file && -r $uptm_file) {
+	if (open my $fh, "<", $uptm_file) {
+		while(<$fh>){
+			@systime{'runtime','idletime'} = split/\s+/;
+			last;
+		}
+		close $fh if $fh;
+  	}
+  }
+  my $processor_number = 0;
+  if (-f $cpu_file && -r $cpu_file) {
+  	if (open my $fh, "<", $cpu_file) {
+		while(<$fh>){
+			if (m/\Aprocessor\s+/i) {
+				$processor_number ++;
+				next;
+			}
+		}
+		close $fh if $fh;
+  	}
+  }
+  $processor_number = 1 if $processor_number == 0;
+  $systime{'idletime'} = $systime{'idletime'}/$processor_number;
+  $systime{'idlerate'} = sprintf("%0.2f",100*$systime{'idletime'}/$systime{'runtime'}).'%';
+  ### %systime
+  $result{'systime'} = \%systime;
+}
+
+
+
+# mem_usage
+if ($data_config{'mem_usage'}) {
+  my %mem_usage = (
+  	'mem_total'	=> '',
+  	'mem_free'	=> '',
+  	'mem_usage'	=> '',
+	'mem_buffer'	=> '',
+	'mem_cache'	=> '',
+  	'swp_total'	=> '',
+  	'swp_free'	=> '',
+  	'swp_usage'	=> '',
+  );
+  my $mem_file = '/proc/meminfo';
+  if (-f $mem_file && -r $mem_file) {
+  	if (open my $fh, "<", $mem_file) {
+		while(<$fh>){
+			if (m/\A\s*MemTotal:\s+(\d+)\s*KB/i) {
+				$mem_usage{'mem_total'} = $1;
+				next;
+			}
+			if (m/\A\s*SwapTotal:\s+(\d+)\s*KB/i) {
+				$mem_usage{'swp_total'} = $1;
+				next;
+			}
+			if (m/\A\s*MemFree:\s+(\d+)\s*KB/i) {
+				$mem_usage{'mem_free'} = $1;
+				next;
+			}
+			if (m/\A\s*SwapFree:\s+(\d+)\s*KB/i) {
+				$mem_usage{'swp_free'} = $1;
+				next;
+			}
+			if (m/\A\s*Buffers:\s+(\d+)\s*KB/i) {
+				$mem_usage{'mem_buffer'} = $1;
+				next;
+			}
+			if (m/\A\s*Cached:\s+(\d+)\s*KB/i) {
+				$mem_usage{'mem_cache'} = $1;
+				next;
+			}
+		}
+		close $fh if $fh;
+		if ($mem_usage{'mem_total'} && $mem_usage{'mem_free'}) {
+			$mem_usage{'mem_usage'} = $mem_usage{'mem_total'}-$mem_usage{'mem_free'};
+		}
+		if ($mem_usage{'swp_total'} && $mem_usage{'swp_free'}) {
+			$mem_usage{'swp_usage'} = $mem_usage{'swp_total'}-$mem_usage{'swp_free'};
+		}
+  	}
+  }
+  ### %mem_usage
+  $result{'mem_usage'} = \%mem_usage;
+}
+
+
+
+# process
+if ($data_config{'process'}) {
+  my %process = (
+  	'totalnum'	=> '',  # by: /proc/\d+/
+  	'state'	=> '',  # by: ps -eo state=
+  	'blocked'	=> '',
+  	'ctxtnum'	=> '',
+  	'forksnum'	=> '',
+  );
+  my $stat_file = '/proc/stat';
+  if (-f $stat_file && -r $stat_file) {
+  	if (open my $fh, "<", $stat_file) {
+		while(<$fh>){
+			if (m/\A\s*ctxt\s+(\d+)/i) {
+				$process{'ctxtnum'} = $1;
+				next;
+			}
+			if (m/\A\s*processes\s+(\d+)/i) {
+				$process{'forksnum'} = $1;
+				next;
+			}
+			if (m/\A\s*procs_blocked\s+(\d+)/i) {
+				$process{'blocked'} = $1;
+				next;
+			}
+		}
+		close $fh if $fh;
+  	}
+  }
+  if (-d "/proc/") {
+  	my @process = glob "/proc/[0-9]*";
+  	$process{'totalnum'} = @process;
+  }
+  my $ps = '/bin/ps';
+  if (-f $ps && -x $ps) {
+  	open my $fh, "$ps -eo stat= 2>&- | ";
+  	my %ps_state = ();
+  	if ($fh) {
+		while(<$fh>){
+			chomp; my $key = substr $_,0,1;
+			$ps_state{$key} ++;
+		}
+  	}
+  	$process{'state'} = \%ps_state;
+  }
+  ### %process
+  $result{'process'} = \%process;
+}
+
+
+
+# netstat
+if ($data_config{'netstat'}) {
+  my %netstat = (
+  	'total_tcp'	=> '',
+  	'total_udp'	=> '',
+  	'net_flow'	=> '',
+  );
+  my $tcp_file = '/proc/net/tcp';
+  my $udp_file = '/proc/net/udp';
+  my $net_devf = '/proc/net/dev';
+  if (-f $tcp_file && -r $tcp_file) {
+  	if (open my $fh, "<", $tcp_file) {
+		my @tcp_content = <$fh>;
+		$netstat{'total_tcp'} = scalar @tcp_content - 1;
+		close $fh if $fh;
+  	}
+  }
+  if (-f $udp_file && -r $udp_file) {
+  	if (open my $fh, "<", $udp_file) {
+		my @udp_content = <$fh>;
+		$netstat{'total_udp'} = scalar @udp_content - 1;
+		close $fh if $fh;
+  	}
+  }
+  if (-f $net_devf && -r $net_devf) {
+ 	if (open my $fh, "<", $net_devf) {
+		my @net_flow = ();
+		while(<$fh>){
+			if (m/\A\s*(.+?):\s*(.*)/) {
+				my %single_flow = ();
+				@{$single_flow{$1}}{qw(
+					rxbyt rxpcks rxerrs rxdrop
+					txbyt txpcks txerrs txdrop
+				)} = (split/\s+/,$2)[0,1,2,3,8,9,10,11];
+				$single_flow{$1}{'ttbyt'} = $single_flow{$1}{'rxbyt'} + $single_flow{$1}{'txbyt'};
+				$single_flow{$1}{'ttpcks'} = $single_flow{$1}{'rxpcks'} + $single_flow{$1}{'txpcks'};
+				push @net_flow, \%single_flow;
+			}
+		}
+		close $fh if ($fh);
+		$netstat{'net_flow'} = \@net_flow;
+ 	}
+  }
+  my $netstat = '/bin/netstat';
+  if ( -f $netstat && -x $netstat) {
+	open my $fh, "$netstat -s 2>&- | ";
+	if ($fh) {
+		my %tcp_statistics = ();
+		my %udp_statistics = ();
+		my ($flag_tcp, $flag_udp) = (0, 0);
+		while(<$fh>){
+			chomp;
+			if (m/\ATcp:\s*\Z/i) {
+				$flag_udp = 0;
+				$flag_tcp = 1;
+				next;
+			} elsif (m/\AUdp:\s*\Z/i) {
+				$flag_udp = 1;
+				$flag_tcp = 0;
+				next;
+			} elsif (m/\A(\w+):\Z/i) {
+				$flag_udp = 0;
+				$flag_tcp = 0;
+				next;
+			}
+			if ($flag_tcp) {
+				if (m/(\d+)\s+?active connections openings/i) {
+					$tcp_statistics{'active_conn'} = $1; next;
+				} 
+				if (m/(\d+)\s+?passive connection openings/i) {
+					$tcp_statistics{'passive_conn'} = $1; next;
+				} 
+				if (m/(\d+)\s+?failed connection attempts/i) {
+					$tcp_statistics{'failed_conn'} = $1; next;
+				} 
+				if (m/(\d+)\s+?connection resets received/i) {
+					$tcp_statistics{'recvreset_conn'} = $1; next;
+				} 
+				if (m/(\d+)\s+?segments received/i) {
+					$tcp_statistics{'seg_received'} = $1; next;
+				} 
+				if (m/(\d+)\s+?segments send out/i) {
+					$tcp_statistics{'seg_sendout'} = $1; next;
+				} 
+				if (m/(\d+)\s+?segments retransmited/i) {
+					$tcp_statistics{'seg_retrans'} = $1; next;
+				} 
+				if (m/(\d+)\s+?bad segments received/i) {
+					$tcp_statistics{'seg_badrecv'} = $1; next;
+				} 
+				if (m/(\d+)\s+?resets sent/i) {
+					$tcp_statistics{'reset_sent'} = $1; next;
+				} 
+			}
+			if ($flag_udp) {
+				if (m/(\d+)\s+?packets received/i) {
+					$udp_statistics{'packet_recv'} = $1; next;
+				} 
+				if (m/(\d+)\s+?packets to unknown port received/i) {
+					$udp_statistics{'packetunknownport_recv'} = $1; next;
+				} 
+				if (m/(\d+)\s+?packet receive errors/i) {
+					$udp_statistics{'packet_recverror'} = $1; next;
+				} 
+				if (m/(\d+)\s+?packets sent/i) {
+					$udp_statistics{'packet_sent'} = $1; next;
+				} 
+			}
+		}
+		if ($tcp_statistics{'seg_sendout'}) {
+			if ($tcp_statistics{'seg_retrans'}) {
+				$tcp_statistics{'seg_retrans_rate'} = sprintf ("%0.2f", 100*$tcp_statistics{'seg_retrans'}/$tcp_statistics{'seg_sendout'}).'%';
+			} else {
+				$tcp_statistics{'seg_retrans_rate'} = '0.00%';
+			}
+		}
+		if ($udp_statistics{'packet_recv'}) {
+			if ($udp_statistics{'packet_recverror'}) {
+				$udp_statistics{'packet_lostrate'} = sprintf ("%0.2f", 100*$udp_statistics{'packet_recverror'}/$udp_statistics{'packet_recv'}).'%';
+			} else {
+				$udp_statistics{'packet_lostrate'} = '0.00%';
+			}
+		}
+		$netstat{'tcp_statistics'} = \%tcp_statistics;
+		$netstat{'udp_statistics'} = \%udp_statistics;
+	}
+  }
+  ### %netstat
+  $result{'netstat'} = \%netstat;
+}
+
+
+# disk_space
+if ($data_config{'disk_space'}) {
+  my @disk_space = ();
+  my @check_fstype = ('ext2','ext3','ext4');	# only collect local filesystem, exclude nfs, gfs ...
+  my ($mtab,$df) = ('/etc/mtab','/bin/df');
+  if (-f $mtab && -r $mtab && -f $df && -x $df) {
+	my @disks = ();
+	if (open my $fh0, "<", $mtab ) {
+		while (<$fh0>) {
+			chomp; my ($dev,$fstype) = (split/\s+/)[0,2];
+			if (defined $fstype && grep(/\A\Q$fstype\E\Z/i, @check_fstype)) {
+				push @disks, $dev;
+			}
+		}
+		close $fh0 if ($fh0);
+		while(my $dev = shift @disks) {
+			my %single_disk = (
+				'dev'		=> $dev,
+				'fstype'	=> '',
+				'mount'		=> '',
+				'msize'		=> '',
+				'mused'		=> '',
+				'mfree'		=> '',
+				'isize'		=> '',
+				'iused'		=> '',
+				'ifree'		=> '',
+			);
+			open my $fh, "$df -lPTk $dev 2>&- | ";
+			if ($fh) {
+				while(<$fh>){
+					if (m/\A\Q$dev\E\s+/i) {
+						@single_disk{'fstype','mount','msize','mused','mfree'} = (split/\s+/)[1,6,2,3,4];
+					}
+				}
+			} 
+			open my $fh1, "$df -lPTi $dev 2>&- | ";
+			if ($fh1) {
+				while(<$fh1>){
+					if (m/\A\Q$dev\E\s+/i) {
+						@single_disk{'isize','iused','ifree'} = (split/\s+/)[2,3,4];
+					}
+				}
+			}
+			push @disk_space, \%single_disk;
+		}
+  	}
+  }
+  ### @disk_space
+  $result{'disk_space'} = \@disk_space;
+}
+
+# process_top
+if ($data_config{'process_top'}) {
+  my %process_top = ();
+  my $top = '/usr/bin/top';
+  if (-f $top && -x $top) {
+	# save process number and memory/cpu usage into %ps_details
+	my %ps_details = ();
+	open my $fh, "$top -n 1 -d 1 -b 2>&- |";
+	if ($fh) {
+		while (<$fh>) {
+			chomp; s/\A\s*//; s/\s*\Z//;
+			next unless m/\A\s*\d+/;
+			my @tmp_arr = split /\s+/;
+			if ($tmp_arr[11] && $tmp_arr[1]) {
+				my $psindex = sprintf("%s(%s)",$tmp_arr[11],$tmp_arr[1]);
+				$ps_details{$psindex}{'num'} ++;
+				$ps_details{$psindex}{'cpu'} += $tmp_arr[8];
+				$ps_details{$psindex}{'mem'} += &c2kb($tmp_arr[5]) ;
+			}
+		}
+	}
+	### %ps_details
+
+	# sort each psindex by cpu/mem/num and saved in @cputop/@memtop/@numtop
+	my (@cputop, @memtop, @numtop) = ();
+	my $topnum = 10;
+
+	# sort by cpu
+	@cputop = ( sort {
+		$ps_details{$b}{'cpu'}  <=>  $ps_details{$a}{'cpu'}		# reverse order
+	} keys %ps_details ) [0..($topnum-1)];
+	$process_top{'cputop'} = [
+		map { 
+			$ps_details{$_}{'name'} = $_;
+			$ps_details{$_}
+		} @cputop
+	];
+
+	# sort by mem
+	@memtop = ( sort {
+		$ps_details{$b}{'mem'}  <=>  $ps_details{$a}{'mem'}		# reverse order
+	} keys %ps_details ) [0..($topnum-1)];
+	$process_top{'memtop'} = [ 
+		map {
+			$ps_details{$_}{'name'} = $_;
+			$ps_details{$_}
+		} @memtop
+	];
+	
+	# sort by num
+	@numtop = ( sort {
+		$ps_details{$b}{'num'}  <=>  $ps_details{$a}{'num'}		# reverse order
+	} keys %ps_details ) [0..($topnum-1)];
+	$process_top{'numtop'} = [
+		map {
+			$ps_details{$_}{'name'} = $_;
+			$ps_details{$_}
+		} @numtop
+	];
+  }
+  ### %process_top
+  $result{'process_top'} = \%process_top;
+}
+
+
+
+##
+##  part_2. system fixinfo
+##
+
+if ($data_config{'product_info'}) {
+  my %product_info = (
+  	'manufacturer'		=> '',
+  	'productname'		=> '',
+  	'productuuid'		=> '',
+  	'serialnumber'		=> '',
+  	'biosvendor'		=> '',
+  	'biosversion'		=> '',
+  	'biosreleasedate'	=> '',
+  	'baseboardmanufacturer'	=> '',
+  	'baseboardproductname'	=> '',
+  	'baseboardversion'	=> '',
+  	'baseboardserialnumber'	=> '',
+  );
+  my %mem_info = (
+  	'memmaxcapacity'	=> '',		# Memory Maximum Capacity
+  	'memmaxdevnum'		=> '',		# Memory Maxinum Plugin Interface
+  	'memfreedevnum'		=> '',		# Memory Free Plugin Interface
+  	'meminstallednum'	=> '',		# Memory Installed Number
+  	'meminstalledsize'	=> '',		# Memory Installed Size (by each)
+  	'memtype'		=> '',
+  	'memspeed'		=> '',
+  	'os_mem_total'		=> '',
+  	'os_swap_total'		=> '',
+  );
+  my $dmidecode = '/usr/sbin/dmidecode';	# dmidecode >= 2.7, [OS >= rhel 5.1]
+  if (-f $dmidecode && -x $dmidecode) {
+  	%product_info = (
+  		'manufacturer'		=> 'system-manufacturer',
+  		'productname'		=> 'system-product-name',
+  		'productuuid'		=> 'system-uuid',
+  		'serialnumber'		=> 'system-serial-number',
+  		'biosvendor'		=> 'bios-vendor',
+  		'biosversion'		=> 'bios-version',
+  		'biosreleasedate'	=> 'bios-release-date',
+		'baseboardmanufacturer'	=> 'baseboard-manufacturer',
+		'baseboardproductname'	=> 'baseboard-product-name',
+		'baseboardversion'	=> 'baseboard-version',
+		'baseboardserialnumber' => 'baseboard-serial-number',
+  	);
+  	foreach my $key (keys %product_info) {
+    		open my $fh, "$dmidecode -s $product_info{$key} 2>&- |";
+    		if ($fh) {
+			while (<$fh>) {
+				chomp; s/(\A\s+|\s+\Z)//g;
+				next if m/\A\s*#/;
+				s/\A\s*//; s/\s*\Z//g; $product_info{$key} = $_;
+				last;
+			}
+    		}
+  	}
+
+  	open my $fh, "$dmidecode -t memory 2>&- |";
+  	if ($fh) {
+		my $memdev_start = 0;
+		my @meminstalledsize = ();
+		my (%memtype,%memspeed);
+		while(<$fh>){
+			chomp; s/(\A\s+|\s+\Z)//g;
+			if (m/\A\s*\Z/){
+				$memdev_start = 0;
+				next;
+			}
+			if (m/\A\s*Maximum\s+Capacity:/i) {
+				$mem_info{'memmaxcapacity'} = &c2kb( (split /:\s+/)[1] );
+				next;
+			}
+			if (m/\A\s*Memory Device/i) {
+				$memdev_start = 1;
+				$mem_info{'memmaxdevnum'}++;
+				next;
+			}
+			if (m/\A\s*Size:/i) {
+				(my $size = (split /:/)[1]) =~ s/\A\s*//g;
+				$mem_info{'meminstallednum'}++;
+				push @meminstalledsize, &c2kb($size);
+				next;
+			}
+			if (m/\A\s*Type:/i && $memdev_start == 1) {
+				(my $memtype = (split /:/)[1]) =~ s/\A\s*//g;
+				$memtype{$memtype}++;
+				next;
+			}
+			if (m/\A\s*Speed:/i && $memdev_start == 1) {
+				(my $memspeed = (split /:/)[1] ) =~ s/\A\s*//g;
+				$memspeed{$memspeed}++;
+				next;
+			}
+		}
+        	if ($mem_info{'memmaxdevnum'} ne '' && $mem_info{'meminstallednum'} ne ''){
+                	$mem_info{'memfreedevnum'} = $mem_info{'memmaxdevnum'} - $mem_info{'meminstallednum'};
+        	}
+		$mem_info{'meminstalledsize'} = \@meminstalledsize;
+
+		my (@memtype,@memspeed);
+                for my $tmp_memtype (sort keys %memtype) {
+                        my %single_memtype = (
+                                'type'		=> $tmp_memtype,
+                                'number'        => $memtype{$tmp_memtype},
+                        );
+                        push @memtype, \%single_memtype; 
+                }
+		$mem_info{'memtype'} = \@memtype;
+
+                for my $tmp_memspeed (sort keys %memspeed) {
+                        my %single_memspeed = (
+                                'speed'		=> $tmp_memspeed,
+                                'number'        => $memspeed{$tmp_memspeed},
+                        );
+                        push @memspeed, \%single_memspeed; 
+                }
+		$mem_info{'memspeed'} = \@memspeed;
+  	}
+  }
+  my $mem_file = '/proc/meminfo';
+  if (-f $mem_file && -r $mem_file) {
+  	if(open my $fh, "<", $mem_file){
+  		while(<$fh>){
+			chomp; s/(\A\s+|\s+\Z)//g;
+			if (m/\AMemTotal:/i) {
+				$mem_info{'os_mem_total'} = (split /\s+/)[1];
+				next;
+			}
+			if (m/\ASwapTotal:/i) {
+				$mem_info{'os_swap_total'} = (split /\s+/)[1];
+				next;
+			}
+  		}
+  		close $fh if ($fh);
+  	}
+  }
+  ### %product_info
+  ### %mem_info
+  $result{'product_info'} = \%product_info;
+  $result{'mem_info'} = \%mem_info;
+}
+
+
+if ($data_config{'cpu_info'}) {
+  my %cpu_info = (
+  	'vendor'	=> '',
+  	'type'		=> '',
+  	'physical'	=> '',
+  	'logical'	=> '',
+  	'speed'		=> '',
+  );
+  my $cpu_file = '/proc/cpuinfo';
+  if (-f $cpu_file && -r $cpu_file) {
+  	if (open my $fh, "<", $cpu_file) {
+		my (%cpu_phyid, %cpu_speed, %cpu_vendor, %cpu_type);
+        	while(<$fh>){
+                	chomp; s/(\A\s+|\s+\Z)//g;
+			if (m/\Aprocessor\s+/i) {
+				$cpu_info{'logical'}++;
+				next;
+			}
+			if (m/\Aphysical\s+id\s+/i) {
+				$cpu_phyid{$_}++;
+				next;
+			}
+			if (m/\Acpu\s+MHz\s+/i) {
+				(my $speed = (split /:/)[1]) =~ s/\A\s*//g;
+				$cpu_speed{$speed.'MHz'}++;
+				next;
+			}
+			if (m/\Avendor_id\s+/i) {
+				(my $vendor = (split /:/)[1]) =~ s/\A\s*//g;
+				$cpu_vendor{$vendor}++;
+				next;
+			}
+			if (m/\Amodel\s+name\s+/i) {
+				(my $type = (split /:/)[1]) =~ s/\A\s*//g;
+				$cpu_type{$type}++;
+				next;
+			}
+	        }
+		close $fh if ($fh);
+		$cpu_info{'physical'} = scalar keys %cpu_phyid;
+		$cpu_info{'physical'} = 1 if $cpu_info{'physical'} == 0;
+
+		my (@cpu_speed,@cpu_vendor,@cpu_type);
+		for my $tmp_speed (sort keys %cpu_speed) {
+			my %single_cpu_speed = (
+				'speed'		=> $tmp_speed,
+				'number'	=> $cpu_speed{$tmp_speed},
+			);
+			push @cpu_speed, \%single_cpu_speed; 
+		}
+		$cpu_info{'speed'} = \@cpu_speed;
+
+		for my $tmp_vendor (sort keys %cpu_vendor) {
+			my %single_cpu_vendor = (
+				'vendor'	=> $tmp_vendor,
+				'number'	=> $cpu_vendor{$tmp_vendor},
+			);
+			push @cpu_vendor, \%single_cpu_vendor;
+		}
+		$cpu_info{'vendor'} = \@cpu_vendor;
+
+		for my $tmp_type (sort keys %cpu_type) {
+			my %single_cpu_type = (
+				'type'		=> $tmp_type,
+				'number'	=> $cpu_type{$tmp_type},
+			);
+			push @cpu_type, \%single_cpu_type;
+		}
+		$cpu_info{'type'} = \@cpu_type;
+  	}
+  }
+  ### %cpu_info
+  $result{'cpu_info'} = \%cpu_info;
+}
+
+
+if ($data_config{'os_info'}) {
+  my %os_info = (
+	  'os_distribute'	=> '',
+	  'os_release'		=> '',
+	  'os_manufacturer'	=> '',
+	  'os_codename'		=> '',
+	  'os_descript'		=> '',
+	  'os_bitmode'		=> $OS_BITMODE,
+	  'arch'		=> '',
+	  'os'			=> '',
+	  'kernel_name'		=> '',
+	  'kernel_release' 	=> '',
+	  'hostname'		=> '',
+  );
+  my $lsb_release = "/usr/bin/lsb_release";
+  if (-f $lsb_release && -x $lsb_release) {
+	  open my $fh, "$lsb_release -a 2>&1 |";
+	  if ($fh) {
+		while(<$fh>){
+			chomp; s/(\A\s+|\s+\Z)//g;
+			next if m/\ALSB Version/i;
+			my ($key,$value) = split /:/;
+			$key = 'os_distribute' if $key =~ /\ADistributor ID/i;
+			$key = 'os_release' if $key =~ /\ARelease/i;
+			$key = 'os_codename' if $key =~ /\ACodename/i;
+			$key = 'os_descript' if $key =~ /\ADescription/i;
+			$value =~ s/\A\s*//g;
+			$os_info{$key} = $value;
+		}
+		if ($os_info{'os_distribute'} =~ m/centos/i) {
+			$os_info{'os_manufacturer'} = 'centos';
+		} elsif ($os_info{'os_distribute'} =~ m/redhat/i) {
+			$os_info{'os_manufacturer'} = 'redhat';
+		} elsif ($os_info{'os_distribute'} =~ m/fedora/i) {
+			$os_info{'os_manufacturer'} = 'fedora';
+		} elsif ($os_info{'os_distribute'} =~ m/suse/i) {
+			$os_info{'os_manufacturer'} = 'suse';
+		}
+	  }
+  }
+  my $uname = "/bin/uname";
+  if (-f $uname && -x $uname) {
+	  my %uname_info = (
+	  	'arch'			=> '-m',
+	  	'os'			=> '-o',
+	  	'kernel_name'		=> '-s',
+	  	'kernel_release' 	=> '-r',
+	  	'hostname'		=> '-n',
+	  );
+	 foreach my $key (keys %uname_info){
+	   open my $fh, "$uname $uname_info{$key} 2>&1 |";
+	   if ($fh) {
+		while(<$fh>){
+			chomp; s/\A\s*//; s/\s*\Z//g; $os_info{$key} = $_;
+			last;
+		}
+	   }
+	 }
+  }
+  ### %os_info
+  $result{'os_info'} = \%os_info;
+}
+
+
+
+
+if ($data_config{'sys_clock'}) {
+  my %sys_clock = (
+	  'timezone'		=> '',
+	  'useutc'		=> '',
+  );
+  my $clockfile = '/etc/sysconfig/clock';
+  if (-f $clockfile && -r $clockfile) {
+	  if(open my $fh, "<", $clockfile){
+		while(<$fh>){
+			chomp; s/(\A\s+|\s+\Z)//g;
+			if (m/\AZONE=/) {
+				s/"//g;
+				$sys_clock{'timezone'} = (split/=/)[1];
+				next;
+			}
+			if (m/\AUTC=/) {
+				$sys_clock{'useutc'} = (split/=/)[1];
+				next;
+			}
+		}
+		close $fh;
+	  }
+  }
+  ### %sys_clock
+  $result{'sys_clock'} = \%sys_clock;
+}
+
+
+
+
+if ($data_config{'selinux'}) {
+  my %selinux = (
+	  'status'		=> '',
+	  'type'		=> '',
+  );
+  my $selinuxfile = '/etc/selinux/config';
+  if (-f $selinuxfile && -r $selinuxfile) {
+	  if (open my $fh, "<", $selinuxfile) {
+		while(<$fh>){
+			chomp; s/(\A\s+|\s+\Z)//g;
+			next if /\A\s*#/;
+			if (m/\A\s*SELINUX\b/) {
+				$selinux{'status'} = (split/=/)[1];
+				next;
+			}
+			if (m/\A\s*SELINUXTYPE\b/) {
+				$selinux{'type'} = (split/=/)[1];
+				next;
+			}
+		}
+		close $fh;
+	  }
+  }
+  ### %selinux
+  $result{'selinux'} = \%selinux;
+}
+
+
+
+
+if ($data_config{'supuser'}) {
+  my @supuser = ();
+  my $userfile = '/etc/passwd';
+  if (-f $userfile && -r $userfile) {
+	  if(open my $fh, "<", $userfile){
+		while(<$fh>){
+			chomp; 
+			next if m/\A\s*#/;
+			s/(\A\s+|\s+\Z)//g;
+			my ($name,$uid,$gid,$homedir,$shell) = (split /:/)[0,2,3,5,6];
+			if ( (defined $shell && -e $shell && $shell =~ /sh\Z/) && 
+			   ($uid eq 0 || $gid eq 0) ) {
+				my %supuser = (
+	  				'name'		=> $name,
+	  				'uid'		=> $uid,
+	  				'gid'		=> $gid,
+	  				'homedir'	=> (-d $homedir) ? $homedir : "$homedir (Missing)",
+	  				'shell'		=> $shell,
+				);
+				push @supuser, \%supuser;
+			}
+		}
+		close $fh;
+	  }
+  }
+  ### @supuser
+  $result{'supuser'} = \@supuser;
+}
+
+
+
+if ($data_config{'runlevel'}) {
+  ### $OS_RUNLEVEL
+  $result{'runlevel'} = $OS_RUNLEVEL;
+}
+
+
+
+if ($data_config{'startups'}) {
+  my @startups = ();
+  my $startdir = "/etc/rc$OS_RUNLEVEL.d/";
+  if (-d $startdir && -r $startdir) {
+	my @start_files = (glob "$startdir/S*");
+  	foreach(@start_files){
+		my $start_file = (split /\//)[-1];
+		if(defined $start_file){
+			$start_file =~ s/\AS\d+//;
+			$start_file = 'rc.local' if $start_file eq 'local';
+			push @startups, $start_file;
+		}
+  	}
+  }
+  ### @startups
+  $result{'startups'} = \@startups;
+}
+
+
+
+if ($data_config{'dns'}) {
+  my @dns = ();
+  my $dnsfile = '/etc/resolv.conf';
+  if (-f $dnsfile && -r $dnsfile) {
+  	if(open my $fh, "<", $dnsfile){
+		while(<$fh>){
+			if(m/\A\s*nameserver\s+(.+)\s*\Z/){
+				push @dns, $1;
+			}
+		}
+		close $fh;
+  	}
+  }
+  ### @dns
+  $result{'dns'} = \@dns;
+}
+
+if ($data_config{'mount'}) {
+  my @mount = ();
+  my $mtabfile = '/etc/mtab';
+  if (-f $mtabfile && -r $mtabfile) {
+  	if (open my $fh, "<", $mtabfile) {
+		while(<$fh>){
+			chomp; s/(\A\s+|\s+\Z)//g;
+			my %mount_dev;
+			@mount_dev{'dev','mount','fstype','args'} = (split /\s+/)[0,1,2,3];
+			if ($mount_dev{'fstype'} =~ m/\b(ext2|ext3|ext4|nfs|gfs|gfs2)\b/i) {
+				push @mount, \%mount_dev;
+			}
+		}
+		close $fh if $fh;
+  	}
+  }
+  ### @mount
+  $result{'mount'} = \@mount;
+}
+
+
+
+# only for inner called
+my %netcard;
+my $lspci = '/sbin/lspci';
+if (-f $lspci && -x $lspci) {
+  open my $fh, "$lspci 2>&- |";
+  if ($fh) {
+	while(<$fh>){
+		chomp; s/(\A\s+|\s+\Z)//g;
+		if (m/Ethernet controller:/i) {
+			my $busid = (split /\s+/)[0];
+			my $desc = (split /Ethernet controller:\s+/i)[1];
+			$netcard{$busid} = $desc;
+		}
+	}
+  }
+}
+
+
+if ($data_config{'inet_name'}) {
+  my @inet_name = ();
+  my $netfile = '/proc/net/dev';
+  my $ethtool = '/sbin/ethtool';
+  my $ifconfig = '/sbin/ifconfig';
+  if (-f $netfile && -r $netfile) {
+	  my @netfaces = ();
+	  if(open FH1, "<", $netfile){
+		while(<FH1>){
+			chomp; s/(\A\s+|\s+\Z)//g;
+			if(/\A\s*(\w+?):\s*(\d+)/i){
+				next if ($1 eq 'lo' || $1 eq 'sit0' || $1 =~ m/range/i);
+				push @netfaces, $1;
+			}
+		}
+		close FH1;
+	  }
+	  foreach(@netfaces){
+		chomp; s/(\A\s+|\s+\Z)//g;
+		my $inet_name = $_;
+		my %inet_info = (
+			'name'			=> $inet_name,
+			'speed'			=> '',
+			'duplex'		=> '',
+			'is_autoneg'		=> '',
+			'is_linked'		=> '',
+			'driver'		=> '',
+			'driver_version'	=> '',
+			'firmware_version'	=> '',
+			'pci_busid'		=> '',
+			'pci_description'	=> '',
+			'encapsulation'		=> '',
+			'mac_address'		=> '',
+			'ipv4_address'		=> '',
+			'ipv4_netmask'		=> '',
+			'mtu'			=> '',
+			'promisc_mode'		=> 'off',
+		);
+		if (-f $ethtool && -x $ethtool) {
+			open my $fh, "$ethtool $inet_name 2>&1 | ";
+			if ($fh) {
+				while(<$fh>){
+					chomp; s/(\A\s+|\s+\Z)//g;
+					$inet_info{'duplex'} = (split/:\s+/)[1] if m/\A\s*Duplex:/;
+					$inet_info{'is_autoneg'} = (split/:\s+/)[1] if m/\A\s*Auto-negotiation:/;
+					$inet_info{'is_linked'} = (split/:\s+/)[1] if m/\A\s*Link detected:/;
+					$inet_info{'speed'} = (split/:\s+/)[1] if m/\A\s*Speed:/;
+					if ( $inet_info{'speed'} =~ m/\A(\d+)\s*Gb\/s\Z/i ) {
+						$inet_info{'speed'} = $1 * 1024 . 'Mb/s';
+					}
+				}
+			}
+			open my $fh1, "$ethtool -i $inet_name 2>&1 | ";
+			if ($fh1) {
+				while(<$fh1>){
+					chomp; s/(\A\s+|\s+\Z)//g;
+					$inet_info{'driver'} = (split/:\s+/)[1] if m/\A\s*driver:/;
+					$inet_info{'driver_version'} = (split/:\s+/)[1] if m/\A\s*version:/;
+					$inet_info{'firmware_version'} = (split/:\s+/)[1] if m/\A\s*firmware-version:/;
+					$inet_info{'firmware_version'} = '' if not defined($inet_info{'firmware_version'});
+					$inet_info{'pci_busid'} = (split/:\s+/)[1] if m/\A\s*bus-info:/;
+				}
+				if (not defined ($inet_info{'pci_busid'})) {
+					$inet_info{'pci_busid'} = '';
+				} else {
+					$inet_info{'pci_busid'} =~ s/\A(.+?)://;	# trim first xxxx:
+					if (exists $netcard{$inet_info{'pci_busid'}}) {
+						$inet_info{'pci_description'} = $netcard{$inet_info{'pci_busid'}};
+					}
+				}
+			}
+		}
+		if (-f $ifconfig && -x $ifconfig) {
+			open my $fh, "$ifconfig $inet_name 2>&1 | ";
+			if ($fh) {
+				while(<$fh>){
+					chomp; s/(\A\s+|\s+\Z)//g;
+					if(m/^$inet_name\s+Link encap:(\w+)\s+HWaddr ((?:[A-Fa-f0-9]{2}:){5}(?:[A-Fa-f0-9]{2}))\s*\Z/i){
+						$inet_info{'encapsulation'} = $1;			
+						$inet_info{'mac_address'} = $2;
+						next;
+					}
+					if(m/\s*inet addr:((([0-9]|([1-9]\d)|(1\d\d)|(2([0-4]\d|5[0-5])))\.){3}([1-9]|([1-9]\d)|(1\d\d)|(2([0-4]\d|5[0-5]))))\s+(.*)Mask:(.+)\Z/){
+						$inet_info{'ipv4_address'} = $1;
+						$inet_info{'ipv4_netmask'} = $14;
+						next;
+					}
+					if(m/\s+MTU:(\d+)\s+/i){
+						$inet_info{'mtu'} = $1;
+						next;
+					}
+				}
+			}
+		}
+		my $flagfile = "/sys/class/net/$inet_name/flags";
+		if (-f $flagfile && -r $flagfile) {
+			open my $fh, "<", $flagfile;
+			if ($fh) {
+				chomp( my $int_flags = <$fh>);
+				if(hex $int_flags & 0x100) {
+					$inet_info{'promisc_mode'} = 'on';
+				}
+			}
+		}
+		push @inet_name, \%inet_info;
+	  }
+  }
+  ### @inet_name
+  $result{'inet_name'} = \@inet_name;
+}
+
+
+
+if ($data_config{'raid_info'}) {
+  my @raid_info = ();
+  my $megacli = '/opt/MegaRAID/MegaCli/MegaCli64';
+  $megacli = '/opt/MegaRAID/MegaCli/MegaCli' if ($OS_BITMODE eq '32');
+  if (-f $megacli && -x $megacli) {
+	  my ($i,$raid_num) = (0,0);
+	  open my $fh, "$megacli -adpCount -NoLog 2>&- | ";
+	  if($fh){
+		while(<$fh>){
+			chomp; s/(\A\s+|\s+\Z)//g;
+			if (/\A\s*Controller Count:\s*(\d+)/i){
+				$raid_num = $1;
+				last;
+			}
+		}
+	  }
+	  for($i=0;$i<$raid_num;$i++){
+	  	my %raid_single = (
+			'RAID_ID'			=> $i,
+	  		'Product_Name'			=> '',
+	  		'Serial_Number'			=> '',
+			'BIOS_Version'			=> '',
+			'RAID_BBU'			=> '',
+			'RAID_Memory'			=> '',
+			'RAID_Temp_Sensor'		=> '',
+			'Current_Time'			=> '',
+			'RAID_Supported'		=> '',
+			'Supported_Drives'		=> '',
+			'Virtual_Disk_Number'		=> '',
+			'Virtual_Disk_Info'		=> '',
+			'Physical_Disk_Number'		=> '',
+			'Physical_Disks_Critical'	=> '',
+			'Physical_Disks_Failed'		=> '',
+			'Physical_Disk_Info'		=> '',
+			'Memory_Correctable_Errors'	=> '',
+			'Memory_Uncorrectable_Errors'	=> '',
+			'Default_Strip_Size'		=> '',
+			'Default_Write_Policy'		=> '',
+			'Default_Read_Policy'		=> '',
+			'Default_Cache_When_BBU_Bad'	=> '',
+	  	);
+		my %raid_temp_sensor = (	### init  %raid_temp_sensor
+			'Present'	=> 0,
+			'Temperature'	=> '',
+		);
+		open my $fh1, "$megacli -AdpAllInfo -a$i -NoLog 2>&- | ";
+		if($fh1){
+			while(<$fh1>){
+				chomp; s/(\A\s+|\s+\Z)//g;
+				if(/\A\s*Product Name\s*:\s*(.+)\s*\Z/i){
+					$raid_single{'Product_Name'} = $1;
+					next;
+				}
+				if(/\A\s*Serial No\s*:\s*(.+)\s*\Z/i){
+					$raid_single{'Serial_Number'} = $1;
+					next;
+				}
+				if(/\A\s*BIOS Version\s*:\s*(.+)\s*\Z/i){
+					$raid_single{'BIOS_Version'} = $1;
+					next;
+				}
+				if(/\A\s*BBU\s*:\s*Present\s*\Z/i){
+					my %bbu_single = (
+						'Present'			=> 1,
+						'Voltage'			=> '',
+						'Temperature'			=> '',
+						'Charging_Status'		=> '',   # Charing, Discharing, None
+						'Learn_Cycle_Status'		=> '',
+						'Learn_Cycle_Active'		=> '',	 # Yes, No
+						'Relative_State_of_Charge' 	=> '',
+						'Battery_Replacement_Required'	=> '',   # Yes, No
+						'Remaining_Capacity_Low'	=> '',   # Yes, No
+						'Charger_Status'		=> '',
+						'Auto_Learn_Mode'		=> '',
+						'Auto_Learn_Period'		=> '',
+						'Next_Learn_time'		=> '',
+					);
+					open my $fh2, "$megacli -AdpBbuCmd -a$i -NoLog 2>&- | ";
+					if($fh2){
+						while(<$fh2>){
+							chomp; s/(\A\s+|\s+\Z)//g;
+							if(/\A\s*Voltage:\s*(.+)\s*\Z/i){
+								$bbu_single{'Voltage'} = $1;
+								next;
+							}
+							if(/\A\s*Temperature:\s*(.+)\s*\Z/i){
+								$bbu_single{'Temperature'} = $1;
+								next;
+							}
+							if(/\A\s*Charging Status\s*:\s*(.+)\s*\Z/i){
+								$bbu_single{'Charging_Status'} = $1;
+								next;
+							}
+							if(/\A\s*Learn Cycle Status\s*:\s*(.+)\s*\Z/i){
+								$bbu_single{'Learn_Cycle_Status'} = $1;
+								next;
+							}
+							if(/\A\s*Learn Cycle Active\s*:\s*(.+)\s*\Z/i){
+								$bbu_single{'Learn_Cycle_Active'} = $1;
+								next;
+							}
+							if(/\A\s*Relative State of Charge:\s*(.+)\s*\Z/i){
+								$bbu_single{'Relative_State_of_Charge'} = $1;
+								next;
+							}
+							if(/\A\s*Battery Replacement required\s*:\s*(.+)\s*\Z/i){
+								$bbu_single{'Battery_Replacement_Required'} = $1;
+								next;
+							}
+							if(/\A\s*Remaining Capacity Low\s*:\s*(.+)\s*\Z/i){
+								$bbu_single{'Remaining_Capacity_Low'} = $1;
+								next;
+							}
+							if(/\A\s*Charger Status:\s*(.+)\s*\Z/i){
+								$bbu_single{'Charger_Status'} = $1;
+								next;
+							}
+							if(/\A\s*Auto-Learn Mode:\s*(.+)\s*\Z/i){
+								$bbu_single{'Auto_Learn_Mode'} = $1;
+								next;
+							}
+							if(/\A\s*Auto Learn Period:\s*(.+)\s*\Z/i){
+								$bbu_single{'Auto_Learn_Period'} = $1;
+								next;
+							}
+							if(/\A\s*Next Learn time:\s*(.+)\s*\Z/i){
+								$bbu_single{'Next_Learn_time'} = $1;
+								next;
+							}
+						}
+					}
+					$raid_single{'RAID_BBU'} = \%bbu_single;
+					next;
+				}
+				if(/\A\s*Memory Size\s*:\s*(.+)\s*\Z/i){
+					$raid_single{'RAID_Memory'} = &c2kb($1);
+					next;
+				}
+				if(/\A\s*Temperature sensor for controller\s*:\s*Present\s*\Z/i){
+					$raid_temp_sensor{'Present'} = 1;
+					next;
+				}
+				if(/\A\s*Controller temperature\s*:\s*(.+)\s*\Z/i){
+					$raid_temp_sensor{'Temperature'} = $1;
+					next;
+				}
+				if(/\A\s*Current Time\s*:\s*(.+)\s*\Z/i){
+					$raid_single{'Current_Time'} = $1;
+					next;
+				}
+				if(/\A\s*RAID Level Supported\s*:\s*(.+)\s*\Z/i){
+					my @raid_supported = split(/,\s+/,$1);
+					$raid_single{'RAID_Supported'} = \@raid_supported;
+					next;
+				}
+				if(/\A\s*Supported Drives\s*:\s*(.+)\s*\Z/i){
+					my @drive_supported = split(/,\s+/,$1);
+					$raid_single{'Supported_Drives'} = \@drive_supported;
+					next;
+				}
+				if(/\A\s*Virtual Drives\s*:\s*(\d+)\s*\Z/i){
+					$raid_single{'Virtual_Disk_Number'} = $1;
+					if ($raid_single{'Virtual_Disk_Number'} > 0) {
+						my @vd_array = ();
+						for(my $v=0;$v<$raid_single{'Virtual_Disk_Number'};$v++){
+							my %vd_single = (
+								'vd_id'			=> 0,
+								'raid_level'		=> '',
+								'size'			=> '',
+								'state'			=> '',
+								'stripe_size'		=> '',
+								'pdnum'			=> '',
+								'depth'			=> '',
+								'encryption'		=> '',
+								'default_cache_policy'	=> '',
+								'current_cache_policy'	=> '',
+								'default_access_policy'	=> '',
+								'current_access_policy'	=> '',
+							);
+							open my $fh3, "$megacli -LDInfo -L$v -a$i -NoLog 2>&- | ";
+							if($fh3){
+								while(<$fh3>){
+									chomp; s/(\A\s+|\s+\Z)//g;
+									if(/\A\s*Virtual Drive\s*:\s*(\d+)\s*/i){
+										$vd_single{'vd_id'} = $1;
+										next;
+									}
+									if(/\A\s*RAID Level\s*:\s*(.+)\s*\Z/i){
+										$vd_single{'raid_level'} = $1;
+										next;
+									}	
+									if(/\A\s*Size\s*:\s*(.+)\s*\Z/i){
+										$vd_single{'size'} = &c2kb($1);
+										next;
+									}	
+									if(/\A\s*State\s*:\s*(.+)\s*\Z/i){
+										$vd_single{'state'} = $1;
+										next;
+									}	
+									if(/\A\s*Strip Size\s*:\s*(.+)\s*\Z/i){
+										$vd_single{'stripe_size'} = &c2kb($1);
+										next;
+									}	
+									if(/\A\s*Number Of Drives\s*:\s*(\d+)\s*\Z/i){
+										$vd_single{'pdnum'} = $1;
+										next;
+									}	
+									if(/\A\s*Span Depth\s*:\s*(\d+)\s*\Z/i){
+										$vd_single{'depth'} = $1;
+										next;
+									}	
+									if(/\A\s*Encryption Type\s*:\s*(.+)\s*\Z/i){
+										$vd_single{'encryption'} = $1;
+										next;
+									}	
+									if(/\A\s*Default Cache Policy\s*:\s*(.+)\s*\Z/i){
+										$vd_single{'default_cache_policy'} = $1;
+										next;
+									}	
+									if(/\A\s*Current Cache Policy\s*:\s*(.+)\s*\Z/i){
+										$vd_single{'current_cache_policy'} = $1;
+										next;
+									}	
+									if(/\A\s*Default Access Policy\s*:\s*(.+)\s*\Z/i){
+										$vd_single{'default_access_policy'} = $1;
+										next;
+									}	
+									if(/\A\s*Current Access Policy\s*:\s*(.+)\s*\Z/i){
+										$vd_single{'current_access_policy'} = $1;
+										next;
+									}	
+								}
+							}
+							if ($vd_single{'raid_level'} =~ m/Primary-1, Secondary-0/i) {
+								$vd_single{'raid_level'} = 'raid1';
+							} elsif ($vd_single{'raid_level'} =~ m/Primary-0, Secondary-0/i) {
+								$vd_single{'raid_level'} = 'raid0';
+							} elsif ($vd_single{'raid_level'} =~ m/Primary-5, Secondary-0/i) {
+								$vd_single{'raid_level'} = 'raid5';
+							} elsif ($vd_single{'raid_level'} =~ m/Primary-1, Secondary-3/i) {
+								$vd_single{'raid_level'} = 'raid10';
+							}
+							push @vd_array, \%vd_single;
+						}
+						$raid_single{'Virtual_Disk_Info'} = \@vd_array;
+					}
+					next;
+				}
+				if(/\A\s*Disks\s*:\s*(\d+)\s*\Z/i){
+					$raid_single{'Physical_Disk_Number'} = $1;
+					if ($raid_single{'Physical_Disk_Number'} > 0) {
+						my @pd_array = ();
+						my %pd_single = (
+							'pd_id'			=> 'X',	# init
+							'pd_type'		=> '',
+							'position'		=> '',
+							'raw_size'		=> '',
+							'coerced_size'		=> '',
+							'media_type'		=> '',
+							'media_error'		=> '',
+							'other_error'		=> '',
+							'predictive_failure'	=> '',
+							'firmware_state'	=> '',
+							'inquiry_data'		=> '',
+							'temperature'		=> '',
+							'write_cache'		=> '',
+						);
+						my $pd_finish_flag = 0;
+						open my $fh4, "$megacli -PDList -a$i -NoLog 2>&- | ";
+						if($fh4){
+							while(<$fh4>){
+								chomp; s/(\A\s+|\s+\Z)//g;
+								# if blank-line, check if single physical disk finished.
+								if(/\A\s*\Z/i){	
+									if($pd_single{'pd_id'} ne 'X' && $pd_finish_flag == 0){
+										$pd_finish_flag = 1;
+										my %tmp_pd_single = %pd_single;
+										push @pd_array, \%tmp_pd_single;
+									}else{
+										$pd_finish_flag = 0;
+										$pd_single{'pd_id'} = 'X';
+									}
+									next;
+								}
+								if(/\A\s*Device Id\s*:\s*(\d+)\s*\Z/i){
+									$pd_single{'pd_id'} = $1;
+									next;
+								}	
+								if(/\A\s*PD Type\s*:\s*(.+)\s*\Z/i){
+									$pd_single{'pd_type'} = $1;
+									next;
+								}	
+								if(/\A\s*Drive\'s postion\s*:\s*(.+)\s*\Z/i){
+									$pd_single{'position'} = $1;
+									next;
+								}	
+	                                                        if(/\A\s*Raw Size\s*:\s*([\d.]+\s+(\w)+)\s*/i){
+	                                                                $pd_single{'raw_size'} = &c2kb($1);
+	                                                                next;
+	                                                        }
+	                                                        if(/\A\s*Coerced Size\s*:\s*([\d.]+\s+(\w)+)\s*/i){
+	                                                                $pd_single{'coerced_size'} = &c2kb($1);
+	                                                                next;
+	                                                        }
+								if(/\A\s*Media Type\s*:\s*(.+)\s*\Z/i){
+									$pd_single{'media_type'} = $1;
+									next;
+								}	
+								if(/\A\s*Media Error Count\s*:\s*(.+)\s*\Z/i){
+									$pd_single{'media_error'} = $1;
+									next;
+								}	
+								if(/\A\s*Other Error Count\s*:\s*(.+)\s*\Z/i){
+									$pd_single{'other_error'} = $1;
+									next;
+								}	
+								if(/\A\s*Predictive Failure Count\s*:\s*(.+)\s*\Z/i){
+									$pd_single{'predictive_failure'} = $1;
+									next;
+								}	
+								if(/\A\s*Firmware state\s*:\s*(.+)\s*\Z/i){
+									$pd_single{'firmware_state'} = $1;
+									next;
+								}	
+								if(/\A\s*Inquiry Data\s*:\s*(.+?)\s*\Z/i){
+									$pd_single{'inquiry_data'} = $1;
+									next;
+								}	
+								if(/\A\s*Drive Temperature\s*:\s*(.+)\s*\Z/i){
+									$pd_single{'temperature'} = $1;
+									next;
+								}	
+								if(/\A\s*Drive\'s write cache\s*:\s*(.+)\s*\Z/i){
+									$pd_single{'write_cache'} = $1;
+									next;
+								}	
+							}
+						}
+						$raid_single{'Physical_Disk_Info'} = \@pd_array;
+					}
+					next;
+				}
+				if(/\A\s*Critical Disks\s*:\s*(\d+)\s*\Z/i){
+					$raid_single{'Physical_Disks_Critical'} = $1;
+					next;
+				}
+				if(/\A\s*Failed Disks\s*:\s*(\d+)\s*\Z/i){
+					$raid_single{'Physical_Disks_Failed'} = $1;
+					next;
+				}
+				if(/\A\s*Memory Correctable Errors\s*:\s*(\d+)\s*\Z/i){
+					$raid_single{'Memory_Correctable_Errors'} = $1;
+					next;
+				}
+				if(/\A\s*Memory Uncorrectable Errors\s*:\s*(\d+)\s*\Z/i){
+					$raid_single{'Memory_Uncorrectable_Errors'} = $1;
+					next;
+				}
+				if(/\A\s*Strip Size\s*:\s*(.+)\s*\Z/i){
+					$raid_single{'Default_Strip_Size'} = &c2kb($1);
+					next;
+				}
+				if(/\A\s*Write Policy\s*:\s*(.+)\s*\Z/i){
+					$raid_single{'Default_Write_Policy'} = $1;
+					next;
+				}
+				if(/\A\s*Read Policy\s*:\s*(.+)\s*\Z/i){
+					$raid_single{'Default_Read_Policy'} = $1;
+					next;
+				}
+				if(/\A\s*Cache When BBU Bad\s*:\s*(.+)\s*\Z/i){
+					$raid_single{'Default_Cache_When_BBU_Bad'} = $1;
+					next;
+				}
+			}
+	  	}
+		$raid_single{'RAID_Temp_Sensor'} = \%raid_temp_sensor;
+	  	push @raid_info, \%raid_single;
+	  }
+  }
+  ### @raid_info
+  $result{'raid_info'} = \@raid_info;
+}
+
+##
+##  part_3. eyou product info 
+##		this is optional, do it or not according by result of [epinfo have] instead of %data_config
+##
+
+if (defined $epinfo && -f $epinfo && -x $epinfo) {
+  my $ephave = 0;
+  open my $fh, "$epinfo have 2>&- |";
+  if ($fh) {
+  	while (<$fh>) {
+		chomp; $ephave = $_;
+		last;
+  	}
+  }
+  if ($ephave) {
+  	my %epinfo = ();
+	my ($_tmp_epinfo_json, $_tmp_epinfo_decode);
+	open $fh, "$epinfo 2>&- |";
+	if ($fh) {
+		while (<$fh>) {
+			chomp; $_tmp_epinfo_json = $_;
+			last;
+		}
+	}
+	if ($_tmp_epinfo_json) {
+		eval { $_tmp_epinfo_decode = JSON->new->allow_nonref->utf8(1)->ascii(1)->decode($_tmp_epinfo_json); };
+		if ($@) {
+			%epinfo = ();
+		} else {
+			%epinfo = %{$_tmp_epinfo_decode};
+		}
+	}
+  	$result{'epinfo'} = \%epinfo;
+  }
+}
+
+### %result
+
+#
+#  END to COLLECT SYSTEM INFORMATION 
+#
+
+print JSON->new->allow_nonref->utf8(1)->ascii(1)->canonical(1)->encode(\%result);

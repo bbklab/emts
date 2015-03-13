@@ -1,0 +1,373 @@
+#!/usr/bin/env perl
+
+BEGIN {
+  @incs = ();
+  push @INC, @incs;
+};
+
+use warnings;
+use strict;
+use utf8;
+use JSON;
+use POSIX;
+use File::Spec::Functions qw(rel2abs);
+use File::Basename qw(dirname);
+# use Smart::Comments;
+binmode(STDIN, ":encoding(utf8)");
+binmode(STDOUT, ":encoding(utf8)");
+binmode(STDERR, ":encoding(utf8)");
+binmode STDOUT, ':raw';
+
+$SIG{'PIPE'} = 'IGNORE';
+
+$| = 1;
+
+# return codes
+our ($state_succ,$state_warn,$state_crit,$state_unkn,$state_noop,$state_notify) = (0,1,2,3,4,5);
+
+# return stuff
+our ($rc, $result) = (0,'');
+
+# defined filename, dirname, mail_licensedecoder
+our $filename = (split /\//, __FILE__)[-1];
+our $dirname  = dirname(rel2abs(__FILE__));
+our $maillicense_decoder = $dirname . '/mail_license.php';
+
+# define EYOU_XXX
+use constant EYOUMAIL_INST  => '/usr/local/eyou/mail';
+use constant EYOUMAIL_ETC   => EYOUMAIL_INST . '/etc';
+use constant EYOUMAIL_CFG   => EYOUMAIL_ETC  . '/eyou_mail.ini';
+
+use constant EYOUGATE_INST  => '/var/emdg';
+use constant EYOUGATE_ETC   => EYOUGATE_INST . '/etc';
+use constant EYOUGATE_CFG   => EYOUGATE_ETC  . '/mail.conf';
+
+use constant EYOUPUSH_INST  => '/usr/local/eYou_ePush'; 
+use constant EYOUPUSH_ETC   => EYOUPUSH_INST . '/ProxyServer/bin/';
+use constant EYOUPUSH_CFG   => EYOUPUSH_ETC  . '/config.properties';
+
+use constant EYOUMAIL4_INST => '/var/eyou';
+use constant EYOUMAIL4_ETC  => EYOUMAIL4_INST . '/etc';
+use constant EYOUMAIL4_CTRL => EYOUMAIL4_ETC  . '/eyoumail';
+
+use constant EYOUARCIV_INST => EYOUMAIL4_INST;
+use constant EYOUARCIV_ETC  => EYOUMAIL4_ETC;
+use constant EYOUARCIV_CTRL => EYOUMAIL4_ETC  . '/eyouarchive';
+
+# check product exist or not ?
+my %ep_exists = (
+	'mail'		=> (-d EYOUMAIL_INST && -f EYOUMAIL_CFG) ? 1 : 0,
+	'gw'		=> (-d EYOUGATE_INST && -f EYOUGATE_CFG) ? 1 : 0,
+	'epush'		=> (-d EYOUPUSH_INST && -f EYOUPUSH_CFG) ? 1 : 0,
+	'mail4'		=> (-d EYOUMAIL4_INST && -f EYOUMAIL4_CTRL) ? 1 : 0,
+	'archive'	=> (-d EYOUARCIV_INST && -f EYOUARCIV_CTRL) ? 1 : 0,
+);
+
+# process cli args
+if (@ARGV) {
+	if ($ARGV[0] eq 'have') {
+		for (keys %ep_exists) {
+			if ($ep_exists{$_}) {
+				print '1'; exit(0);
+			}
+		}
+		print '0';
+	}
+	exit (0);
+}
+
+sub read_ini {
+    my ($section,$key,$file) = @_;
+
+    unless (-f $file && -s $file) {
+	return undef;
+    }
+	
+    unless ($section && $key) {
+	return undef;
+    }
+
+    unless (open FH, "<", $file) {
+	return undef;
+    }
+
+    my $flag = 0;
+    while (<FH>) {
+	if (m/\A\s*\[\s*($section)\s*\]\s*\Z/) {
+		$flag = 1;
+		next;
+	}
+	if (m/\A\s*\[\s*(\w+)\s*\]\s*\Z/) {
+		last if $flag;
+	}
+	if (m/\A\s*$key\s*=\s*(.+)\s*\Z/) {
+		if ($flag) {
+			my $value = $1;
+			$value =~ s/\A\s*//g;
+			$value =~ s/\s*\Z//g;
+			close FH;
+			return $value;
+		}
+	}
+    }
+    close FH;
+    return undef;	# this is important, otherwise return 1
+}
+
+#
+#  BEGIN to COLLECT eYou INFORMATION 
+#
+
+# init each eyou product hash
+my (%mail, %gw, %epush, %mail4, %archive, %result);
+
+# get mail_serial
+my $mail_serial = undef;
+my $em_serial1 = EYOUMAIL_INST . '/sbin/em_serial';
+my $em_serial2 = EYOUMAIL_INST . '/app/sbin/em_serial';
+my $em_serial = (-f $em_serial1 && -x $em_serial1) ? $em_serial1 :$em_serial2;
+if (-f $em_serial && -x $em_serial) {
+	open my $fh, "$em_serial 2>&- |";
+	if ($fh) {
+		while(<$fh>){
+			chomp; 
+			next if (m/\A\s*#/ || m/\A\s*;/ || m/\A\s*\Z/);
+			$mail_serial = $_;
+			last if ($mail_serial);
+		}
+	}
+}
+
+# get mail_license
+my %mail_license = ();
+my $mail_license = undef;
+my $mailphp = EYOUMAIL_INST . '/opt/bin/php';
+if (-f $mailphp && -x $mailphp) {
+	if ( $maillicense_decoder
+	&& length $maillicense_decoder
+	&& -f $maillicense_decoder
+	&& -x $maillicense_decoder ) {
+		open my $fh, "sudo -u eyou $mailphp $maillicense_decoder 2>&- |";
+		if($fh){
+			while(<$fh>){
+				chomp; $mail_license = $_ unless (m/\A\s*\Z/);
+				last;
+			}
+		}
+	}
+}
+if ($mail_license) {	# json decode and test if error or not ?
+	eval { $mail_license = JSON->new->allow_nonref->utf8(1)->ascii(1)->decode($mail_license); };
+	unless ($@) {
+		%mail_license = %{$mail_license};
+	}
+}
+
+# get mail_startups
+my @mail_startups = ();
+my $mail_initctrl = EYOUMAIL_INST . '/etc/em_init_config';
+if (-f $mail_initctrl && -x $mail_initctrl) {
+	if (open my $fh, "<$mail_initctrl") {
+		my $flag = 0;
+		while (<$fh>) {
+			chomp;
+			next if (m/\A\s*#/ || m/\A\s*;/ || m/\A\s*\Z/);
+			if (m/\A\s*ARRAY_START=/) {
+				$flag = 1;
+				next;
+			}
+			if (m/\)/) {
+				$flag = 0 if ($flag);
+				next;
+			}
+			if ($flag) {
+				s/\A\s*|\s*\Z//gi;
+				push @mail_startups, $_;
+				next;
+			}
+		}
+		close $fh if $fh;
+	}
+}
+
+# get gw version
+my $gw_version = undef;
+my $gw_version_ini = EYOUGATE_ETC . '/version.ini';
+if (-f $gw_version_ini) {
+	if (open my $fh, "<$gw_version_ini") {
+		while (<$fh>) {
+			chomp;
+			next if (m/\A\s*#/ || m/\A\s*;/ || m/\A\s*\Z/);
+			$gw_version = $_;
+			last if ($gw_version);
+		}
+		close $fh if $fh;
+	}
+}
+
+# get gw_serial
+my $gw_serial = undef;
+my $gw_eyouunid = EYOUGATE_INST . '/sbin/eyouunid';
+if (-f $gw_eyouunid && -x $gw_eyouunid) {
+	open my $fh, "$gw_eyouunid 2>&- |";
+	if ($fh) {
+		while (<$fh>) {
+			chomp; 
+			next if (m/\A\s*#/ || m/\A\s*;/ || m/\A\s*\Z/);
+			$gw_serial = $_;
+			last if ($gw_serial);
+		}
+	}
+}
+
+# get gw_domainsum
+my $gw_domainsum = undef;
+my $gw_domainconf = EYOUGATE_INST . '/etc/domain.conf';
+if (-f $gw_domainconf) {
+	if (open my $fh, "<$gw_domainconf") {
+		my @gw_domains = <$fh>;
+		$gw_domainsum = scalar @gw_domains;
+		close $fh if $fh;
+	}
+}
+
+# get gw_license
+my %gw_license = ();
+my $gw_mysqlcli = '/opt/mysql/bin/mysql';
+my $gw_dbconfig = EYOUGATE_ETC . '/mysql.conf';
+my ($gw_dbhost, $gw_dbport, $gw_dbuser, $gw_dbpass) = (
+	read_ini('global', 'mysql_host', $gw_dbconfig) || '127.0.0.1',
+	read_ini('global', 'mysql_port', $gw_dbconfig) || '3301',
+	read_ini('global', 'mysql_user', $gw_dbconfig) || 'root',
+	read_ini('global', 'mysql_pass', $gw_dbconfig) || '',
+);
+if (-f $gw_mysqlcli && -x $gw_mysqlcli) {
+	if ($gw_dbhost && $gw_dbhost eq 'localhost') {
+		$gw_dbhost = '127.0.0.1';
+	}
+	if ($gw_dbpass && length $gw_dbpass) {
+		$gw_mysqlcli = "$gw_mysqlcli -h $gw_dbhost -P $gw_dbport -u$gw_dbuser -p$gw_dbpass -D filter -s -e ";
+	} else {
+		$gw_mysqlcli = "$gw_mysqlcli -h $gw_dbhost -P $gw_dbport -u$gw_dbuser -D filter -s -e ";
+	}
+	my $sql = "SELECT license_type, start_date, expire_date, max_child FROM system_config\\G";
+	open my $fh, "$gw_mysqlcli \"$sql\" 2>&- | ";
+	if ($fh) {
+		while (<$fh>) {
+			chomp;
+			next if (m/\A\s*#/ || m/\A\s*;/ || m/\A\s*\Z/);
+			if (m/\A\s*license_type:\s*(\d+)\s*\Z/) {
+				$gw_license{'license_type'} = $1;
+				next;
+			}
+			if (m/\A\s*start_date:\s*(\d+)\s*\Z/) {
+				eval { $gw_license{'start_date'} = sprintf("%s",strftime("%Y-%m-%d_%H:%M:%S", localtime($1))); };
+				if ($@) {
+					$gw_license{'start_date'} = $1;
+				}
+				next;
+			}
+			if (m/\A\s*expire_date:\s*(\d+)\s*\Z/) {
+				eval { $gw_license{'expire_date'} = sprintf("%s",strftime("%Y-%m-%d_%H:%M:%S", localtime($1))); };
+				if ($@) {
+					$gw_license{'expire_date'} = $1;
+				}
+				next;
+			}
+			if (m/\A\s*max_child:\s*(\d+)\s*\Z/) {
+				$gw_license{'max_child'} = $1;
+				next;
+			}
+		}
+	}
+}
+
+
+
+# get epush version
+my $epush_version = undef;
+if (-f EYOUPUSH_CFG) {
+	if (open my $fh, "<", EYOUPUSH_CFG) {
+		while (<$fh>) {
+			chomp;
+			next if (m/\A\s*#/ || m/\A\s*;/ || m/\A\s*\Z/);
+			if (m/\A\s*lastestVersion\s*=\s*(.+)\s*\Z/) {
+				$epush_version = $1;
+				$epush_version =~ s/\A\s*|\s*\Z//gi;
+				last;
+			}
+		}
+		close $fh if $fh;
+	}
+}
+
+# get mail4 version
+my $mail4_version = undef;
+my $mail4_scriptd = EYOUMAIL4_INST . '/sbin/eyou_scriptd';
+if (-f $mail4_scriptd) {
+	open my $fh, "/usr/bin/strings $mail4_scriptd 2>&- | ";
+	if ($fh) {
+		while (<$fh>) {
+			chomp;
+			if (m/\A\s*VERSION-INFO:(.+)\Z/) {
+				$mail4_version = $1;
+				$mail4_version =~ s/email-//gi;
+				last;
+			}
+		}
+	}
+}
+
+#
+#  END to COLLECT eYou INFORMATION 
+#
+
+
+# PREPARE LAST RESULT HASH
+%mail = (
+	'is_installed'		=> $ep_exists{'mail'},
+        'license'		=> \%mail_license,
+	'serial'		=> $mail_serial,
+	'startups'		=> \@mail_startups,
+);
+
+%gw = (
+	'is_installed'		=> $ep_exists{'gw'},
+	'version'		=> $gw_version,
+	'serial'		=> $gw_serial,
+	'domains'		=> $gw_domainsum,
+	'license'		=> \%gw_license,
+);
+
+%epush = (
+	'is_installed'		=> $ep_exists{'epush'},
+	'version'		=> $epush_version,
+);
+
+%mail4 = (
+	'is_installed'		=> $ep_exists{'mail4'},
+	'version'		=> $mail4_version,
+);
+
+%archive = (
+	'is_installed'		=> $ep_exists{'archive'},
+);
+
+%result = (
+	'mail'		=> \%mail,
+	'gw'		=> \%gw,
+	'epush'		=> \%epush,
+	'mail4'		=> \%mail4,
+	'archive'	=> \%archive,
+);
+### %result
+
+eval { $result = JSON->new->utf8(1)->ascii(1)->encode(\%result); };
+unless($@){
+	print "$result";
+	exit $state_succ;
+} else {
+	$@ =~ s/[\r\n]//g;
+	print "$@";
+	exit $state_warn;
+}
