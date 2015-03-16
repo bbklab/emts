@@ -1,0 +1,54 @@
+#!/usr/bin/env bash
+
+show_help(){
+cat <<EOF
+Arguments:   {port_list}
+Usage:       "80 110 3306"
+
+Output:  
+{port},{totol},{server connect stats},{top10 client connect stats}
+
+Example:
+110,61,TIME_WAIT:42 FIN_WAIT2:2 ESTABLISHED:16 LISTEN:1, 166.111.99.132:10 59.66.145.161:3 166.111.98.132:2
+EOF
+exit 0;
+}
+
+[ "$1" == "help" -o "$1" == "h" ] && show_help;
+
+port_list=$1
+[ -z "${port_list}" ] && port_lis="80"
+
+csingle(){
+  local s_port=$1  statfile=$2
+
+  local connstat=$( /bin/awk '($4~/:'${s_port}'\>/){num[$NF]++} \
+				END{ for(c in num) \
+						printf("%s:%s ",c,num[c]) }'\
+		 	"${statfile}" 2>&- )
+  local ipstat=$( ( /bin/awk '$4~/:'${s_port}'\>/ {print $5}' \
+			"${statfile}" 2>&- |\
+		   /bin/awk -F: '($(NF-1)!=""){Num[$(NF-1)]++} \
+				END{for (c in Num) \
+						printf("%s:%s "),c,Num[c]}' |\
+		   sort -rn | head -n 10 ) 2>&- )  ## only print top 10 ipaddress
+  local total=$( (echo -e "${connstat}" | /bin/awk 'BEGIN{t=0} { {for(i=1;i<=NF;i++){split($i,a,":");{t+=a[2]}}} }  END{print t}' ) 2>&- )
+
+  echo -e "${s_port},${total},${connstat},${ipstat}"
+  return
+}
+
+check(){
+  local statfile="/tmp/.check_tcpconn_num.statfile.mole"
+  /bin/netstat -an > "${statfile}" 2>&-
+  if [ ! -f "${statfile}" ] || [ ! -s "${statfile}" ]; then
+        return
+  fi
+
+  for port_num in `echo "${port_list}"`
+  do
+	csingle "${port_num%%:*}" "${statfile}"   ## No need to set limit number
+  done
+}
+
+check

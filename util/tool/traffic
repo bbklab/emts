@@ -1,0 +1,91 @@
+#!/usr/bin/env bash
+
+show_help(){
+cat <<EOF
+Arguments:   {ifdev}
+Usage:   eth0:5M/s:10M/s:0:0
+
+Output:   
+Example:
+EOF
+exit 0;
+}
+[ "$1" == "help" -o "$1" == "h" ] && show_help;
+
+ifdev_lst="$1"
+interval=1
+count=10
+[ -z "${ifdev_lst}" ] && ifdev_lst="eth0"
+
+is_int() {
+  local item="$1"
+  if [ -z "${item}" ] || [ ! -z "${item//[0-9]}" ]; then
+	return 1
+  else
+	return 0
+  fi
+}
+
+csingle(){
+  local inet_face=$1
+
+  if [ -z "${inet_face}" ]; then
+	return
+  elif [ ! -d "/sys/class/net/${inet_face}" ]; then
+	return
+  fi
+
+  # begin to collect netflow data
+  local ibytes=0 obytes=0 ipacks=0 opacks=0
+  local l_ibytes=0 l_obytes=0 l_ipacks=0 l_opacks=0
+  local ib=0 ob=0 ip=0 op=0
+
+  for ((i=0;i<=${count};i++))
+  do 
+	### another way is reading file: /proc/net/dev
+	ibytes=$(cat /sys/class/net/${inet_face}/statistics/rx_bytes 2>&-)
+	obytes=$(cat /sys/class/net/${inet_face}/statistics/tx_bytes 2>&-)
+	ipacks=$(cat /sys/class/net/${inet_face}/statistics/rx_packets 2>&-)
+	opacks=$(cat /sys/class/net/${inet_face}/statistics/tx_packets 2>&-)
+	if ! is_int "${ibytes}" || ! is_int "${obytes}"; then
+		return 
+	elif ! is_int "${ipacks}" || ! is_int "${opacks}"; then
+		return
+	else
+		[ "${l_ibytes}" == "0" ] && l_ibytes=${ibytes}
+		[ "${l_obytes}" == "0" ] && l_obytes=${obytes}
+		[ "${l_ipacks}" == "0" ] && l_ipacks=${ipacks}
+		[ "${l_opacks}" == "0" ] && l_opacks=${opacks}
+		ib=$(( ${ibytes} - ${l_ibytes} )); ((ib+=${ib}))
+		ob=$(( ${obytes} - ${l_obytes} )); ((ob+=${ob}))
+		ip=$(( ${ipacks} - ${l_ipacks} )); ((ip+=${ip}))
+		op=$(( ${opacks} - ${l_opacks} )); ((op+=${op}))
+		sleep ${interval}
+	fi
+  done
+	
+  ib_rate_b=$(( ${ib} / (${count} * ${interval}) ))
+  ib_rate_m=$( echo -e "scale=3; ${ib_rate_b}/1024/1024" | bc 2>&- )
+  ob_rate_b=$(( ${ob} / (${count} * ${interval}) ))
+  ob_rate_m=$( echo -e "scale=3; ${ob_rate_b}/1024/1024" | bc 2>&- )
+  ip_rate=$(( ${ip} / (${count} * ${interval}) ))
+  op_rate=$(( ${op} / (${count} * ${interval}) ))
+
+  # human readable
+  if (echo -e "${ib_rate_m}" | grep -E -o "^\.") >/dev/null 2>&1; then
+       	ib_rate_m="0${ib_rate_m}"
+  fi  
+  if (echo -e "${ob_rate_m}" | grep -E -o "^\.") >/dev/null 2>&1; then
+       	ob_rate_m="0${ob_rate_m}"
+  fi  
+
+}
+
+check(){
+  for pairs in `echo "${ifdev_lst}"`
+  do
+   	csingle "${dev}"
+  done
+}
+
+check

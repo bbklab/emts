@@ -1,0 +1,62 @@
+#!/usr/bin/env bash
+
+show_help(){
+cat <<EOF
+Arguments:   {mysqladmin_path}  {ip,port,user,pass  ip,port,user,pass  ...}
+Usage:       /opt/mysql/bin/mysqladmin  "127.0.0.1,3306,eyou,eyou 127.0.0.1,3316,eyou,eyou"
+
+Output:   
+{ip:port} succ
+{ip:port} warn {[result]}
+Example:
+127.0.0.1:3308 warn 'Access denied for user 'eyou'@'localhost' (using password: YES)'
+127.0.0.1:3308 succ
+EOF
+exit 0;
+}
+MODE=0
+[ "$1" == "help" -o "$1" == "h" ] && show_help;
+
+mysqladmin_path="$1"
+mysql_conn_conf="$2"
+mysql_time_out=10
+
+[ -z "${mysqladmin_path}" ] && mysqladmin_path="/usr/local/eyou/mail/opt/mysql/bin/mysqladmin"
+[ -z "${mysql_conn_conf}" ] && mysql_conn_conf="127.0.0.1,3306,eyou,eyou"
+
+check() {
+
+  if [ -f "${mysqladmin_path}" ] && [ -x "${mysqladmin_path}" ]; then
+	:
+  else
+	return
+  fi
+
+  for pairs in `echo "${mysql_conn_conf}"`
+  do
+	sepnum=$(echo -e "${pairs}" | /bin/awk -F"," 'END{print --NF}')
+	if [ "${sepnum}" != "3" ]; then
+		continue 1
+	fi
+
+  	mysql_host="$(echo -e "${pairs}"|/bin/awk -F"," '{print $1}')"
+  	mysql_port="$(echo -e "${pairs}"|/bin/awk -F"," '{print $2}')"
+  	mysql_user="$(echo -e "${pairs}"|/bin/awk -F"," '{print $3}')"
+  	mysql_pass="$(echo -e "${pairs}"|/bin/awk -F"," '{print $4}')"
+	if [ -z "${mysql_pass}" ]; then
+		cmd="${mysqladmin_path} -h ${mysql_host} -P ${mysql_port} -u${mysql_user} --connect-timeout ${mysql_time_out} "
+	else
+		cmd="${mysqladmin_path} -h ${mysql_host} -P ${mysql_port} -u${mysql_user} -p"${mysql_pass}" --connect-timeout ${mysql_time_out} "
+	fi
+
+	ping_result=$( ${cmd} ping 2>&1 )
+	ping_result=$( (echo -e "${ping_result}" | sed -e '/password on the command line/d' |tr -d '\r\n') 2>&- )
+	if [ "$(echo "${ping_result}"|grep -E -o -i "is alive")" == "" ]; then
+		echo "${mysql_host}:${mysql_port} warn ${ping_result}"
+	else
+		echo "${mysql_host}:${mysql_port} succ"
+	fi
+  done
+}
+
+check

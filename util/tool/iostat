@@ -1,0 +1,74 @@
+#!/usr/bin/env bash
+
+show_help(){
+cat <<EOF
+Argument: <dev-list>
+Example:  "/dev/sda1 /dev/sda3"
+
+Output   :   {devpath} {mpoint} %{util}
+Example  :   
+/dev/sda1 /boot 0.006%
+/dev/mapper/VolGroup-lv_root / 81.08%
+EOF
+exit 0;
+}
+[ "$1" == "help" -o "$1" == "h" ] && show_help;
+
+
+dev_list=$1
+
+check(){
+
+  if [ -z "${dev_list}" ]; then
+	return
+  fi
+
+  local iostat="${UTIL_IOSTAT}"
+  if [ -f "${iostat}" ] && [ -x "${iostat}" ]; then
+	:
+  else
+	iostat="/usr/bin/iostat"
+  fi
+  if [ -f "${iostat}" ] && [ -x "${iostat}" ]; then
+	:
+  else
+	iostat="/usr/local/bin/iostat"
+  fi
+  
+  if [ ! -f "${iostat}" ] || [ ! -x "${iostat}" ]; then
+	return
+  fi
+
+  local mtabfile="/etc/mtab"
+
+  # collect data
+  local iostat_data=$( ${iostat} -d -x ${dev_list} 1 11 2>&1 )
+  
+  for dev in ${dev_list}
+  do
+	if [ ! -e "${dev}" ]; then
+		continue
+	fi
+
+	if [ -L "${dev}" ]; then	# in case of lvm
+		dev_tmpname="$(/bin/readlink ${dev} 2>&-)"
+		devname="${dev_tmpname##*/}"
+	else
+		devname="${dev##*/}"
+	fi
+
+	util=$( echo -e "${iostat_data}" | /bin/awk 'BEGIN{i=0;x=0} ($1~/^'${devname}'\>/){i++} {if(i>1 && $1~/^'${devname}'\>/){x+=$NF}} END{print x/10}' 2>&- )
+	if [ -z "${util}" ] || [ ! -z "${util//[0-9.]}" ]; then
+		util=0
+	fi
+
+	mpoint=$( /bin/awk -v d="${dev}" '($1==d){print $2;exit;}' "${mtabfile}" 2>&- )
+	if [ -z "${mpoint}" ]; then
+		continue
+	fi
+
+	echo "${dev} ${mpoint} ${util}%"
+  done
+}
+
+check

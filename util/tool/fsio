@@ -1,0 +1,72 @@
+#!/usr/bin/env bash
+
+show_help(){
+cat <<EOF
+Argument: <nil>
+
+Output:   
+FS_Stat: succ {device} {fstype}
+FS_Stat: warn {device} {fstype} {stat}
+Disk_IO: succ {device} {fstype} 
+Disk_IO: warn {device} {fstype} {io-error}
+
+Example:
+FS_Stat: succ /dev/sda1 ext4
+FS_Stat: succ /dev/sda3 ext4
+Disk_IO: succ / ext4
+Disk_IO: succ /data ext4
+EOF
+exit 0;
+}
+[ "$1" == "help" -o "$1" == "h" ] && show_help;
+
+
+fstype="ext2 ext3 ext4"
+
+check(){
+
+  if [ -f "/sbin/tune2fs" ] && [ -x "/sbin/tune2fs" ]; then
+	:
+  else
+        return
+  fi
+
+  if [ -f "/etc/mtab" ] && [ -s "/etc/mtab" ]; then
+	:
+  else
+	return
+  fi
+
+  local result= mpoint= warnnum=0  unknnum=0
+
+  for t in `echo "${fstype}"`
+  do
+	devices=$(/bin/awk '($3~/\<'${t}'\>/){print $1}' "/etc/mtab" 2>&-|tr '\n' ' ')
+  	for d in `echo "${devices}"`
+  	do
+		stat=$(/sbin/tune2fs -l "${d}" 2>&- | /bin/awk -F: '($1~/Filesystem state/){gsub(" ","",$2);print $2;exit}')
+		if [ "${stat}" == "clean" ]; then
+			echo "FS_Stat: succ ${d} ${t}"
+		else
+			echo "FS_Stat: warn ${d} ${t} ${stat}"
+		fi
+  	done
+  done
+
+  for t in `echo "${fstype}"`
+  do  
+        mpoint=$(/bin/awk '($3~/\<'${t}'\>/){print $2}' "/etc/mtab" 2>&-|tr '\n' ' ')
+        for m in `echo "${mpoint}"`
+        do  
+                ioerr=$(/bin/touch "${m}/.disk_fs.iotest" 2>&1 1>/dev/null)
+  		rc=$?
+		if [ "${rc}" == "0" ]; then
+                       	echo "Disk_IO: succ ${m} ${t}"
+		else
+			echo "Disk_IO: warn ${m} ${t} ${ioerr}"
+		fi
+        done
+  done
+}
+
+check

@@ -1,0 +1,38 @@
+#!/usr/bin/env bash
+
+show_help(){
+cat <<EOF
+Arguments:   <nil>
+
+Output:   {total} {local_num} {remote_num} {bounce_num} {mlist_num} {tmp_num}
+Example:  11 3 8 0 0 0
+EOF
+exit 0;
+}
+[ "$1" == "help" -o "$1" == "h" ] && show_help;
+
+check(){
+  local total=0
+  local ldir="/usr/local/eyou/mail/queue/Local/Info"
+  local rdir="/usr/local/eyou/mail/queue/Remote/Info"
+  local bdir="/usr/local/eyou/mail/queue/Bounce/Info"
+  local mdir="/usr/local/eyou/mail/queue/Mlist/Info"
+  local tdir="/usr/local/eyou/mail/queue/Tmp/Info"
+
+  if [ -d "${ldir}" ] && [ -d "${rdir}" ] && [ -d "${bdir}" ]; then
+	:
+  else
+	return
+  fi
+
+  ln=$( (find ${ldir}/[0-3][0-9] -follow -type f 2>&-| wc -l) 2>&- )
+  rn=$( (find ${rdir}/[0-3][0-9] -follow -type f 2>&-| wc -l) 2>&- )
+  bn=$( (find ${bdir}/[0-3][0-9] -follow -type f 2>&-| wc -l) 2>&- )
+  mn=$( (find ${mdir}/[0-3][0-9] -follow -type f 2>&-| wc -l) 2>&- )
+  tn=$( (find ${tdir}/[0-3][0-9] -follow -type f 2>&-| wc -l) 2>&- )
+  total=$(( ${ln} + ${rn} + ${bn} + ${mn} + ${tn} ))
+
+  echo "${total} ${ln} ${rn} ${bn} ${mn} ${tn}"
+}
+
+check

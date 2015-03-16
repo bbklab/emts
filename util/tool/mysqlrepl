@@ -1,0 +1,93 @@
+#!/usr/bin/env bash
+
+show_help(){
+cat <<EOF
+Arguments:   {mysqlcli_path}  {ip,port,user,pass  ip2,port2,user2,pass2  ...}
+Usage:       /opt/mysql/bin/mysql "127.0.0.1,3306,eyou,eyou 127.0.0.1,3316,eyou,eyou"
+
+Output:
+{ip:port} succ
+{ip:port} warn {erro-result}
+
+Example:
+127.0.0.1:3306  succ
+169.131.5.95:3316 warn error-stuff
+EOF
+exit 0;
+}
+MODE=0
+[ "$1" == "help" -o "$1" == "h" ] && show_help;
+
+mysqlcli_path="$1"
+mysql_conn_conf="$2"
+mysql_time_out=5
+
+[ -z "${mysqlcli_path}" ] && mysqlcli_path="/usr/local/eyou/mail/opt/mysql/bin/mysql"
+[ -z "${mysql_conn_conf}" ] && mysql_conn_conf="127.0.0.1,3306,eyou,eyou"
+
+check() {
+
+  if [ -f "${mysqlcli_path}" ] && [ -x "${mysqlcli_path}" ]; then
+	:
+  else
+	return
+  fi
+
+  for pairs in `echo "${mysql_conn_conf}"`
+  do
+	sepnum=$(echo -e "${pairs}" | /bin/awk -F"," 'END{print --NF}')
+	if [ "${sepnum}" != "3" ]; then
+		continue 1
+	fi
+
+  	mysql_host="$(echo -e "${pairs}"|/bin/awk -F"," '{print $1}')"
+  	mysql_port="$(echo -e "${pairs}"|/bin/awk -F"," '{print $2}')"
+  	mysql_user="$(echo -e "${pairs}"|/bin/awk -F"," '{print $3}')"
+  	mysql_pass="$(echo -e "${pairs}"|/bin/awk -F"," '{print $4}')"
+	if [ -z "${mysql_pass}" ]; then
+		cmd="${mysqlcli_path} -h ${mysql_host} -P ${mysql_port} -u${mysql_user} --connect-timeout ${mysql_time_out} "
+	else
+		cmd="${mysqlcli_path} -h ${mysql_host} -P ${mysql_port} -u${mysql_user} -p"${mysql_pass}" --connect-timeout ${mysql_time_out} "
+	fi
+
+	result=
+	tmpfile="/var/tmp/${0##*/}.slave.info.tmp"
+	touch $tmpfile 2>&-
+	errstuff=$( ${cmd} -s -e "SHOW SLAVE STATUS\G" 2>&1 1>"${tmpfile}" )
+	if [ "$?" == "0" ]; then
+		if [ -f "${tmpfile}" ] && [ -s "${tmpfile}" ]; then
+			eval $( /bin/awk -F":[ \t]*" '\
+				(/^[ \t]*Master_Server_Id:/){print "master_id=\""$2"\";";next} \
+				(/^[ \t]*Master_Host:/){print "master_host=\""$2"\";";next} \
+				(/^[ \t]*Master_Port:/){print "master_port=\""$2"\";";next} \
+				(/^[ \t]*Master_User:/){print "master_user=\""$2"\";";next} \
+				(/^[ \t]*Slave_IO_Running:/){print "io_running=\""$2"\";";next} \
+				(/^[ \t]*Slave_SQL_Running:/){print "sql_running=\""$2"\";";next} \
+				(/^[ \t]*Last_Errno:/){print "last_errno=\""$2"\";";next} \
+				(/^[ \t]*Last_Error:/){print "last_error=\""$2"\";";next} \
+				(/^[ \t]*Slave_IO_State:/){print "slave_iostate=\""$2"\";";next} \
+				(/^[ \t]*Last_IO_Errno:/){print "last_ioerrno=\""$2"\";";next} \
+				(/^[ \t]*Last_IO_Error:/){print "last_ioerror=\""$2"\";";next} \
+				(/^[ \t]*Last_SQL_Errno:/){print "last_sqlerrno=\""$2"\";";next} \
+				(/^[ \t]*Last_SQL_Error:/){print "last_sqlerror=\""$2"\";";next} \
+			    ' "${tmpfile}" 2>&- )
+			if [ "${io_running}" != "Yes" ] || [ "${sql_running}" != "Yes" ]; then
+				result="${result} warn IO Thread:${io_running}; SQL Thread:${sql_running}; Last ErrNo:${last_errno}; Last Error:${last_error};"
+				result="${result} Last IO Errno:${last_ioerrno}; Last IO Error:${last_ioerror};"
+				result="${result} Last SQL Errno:${last_sqlerrno}; Last SQL Error:${last_sqlerror}"
+			else
+				result="${result} succ IO/SQL Thread Running"
+			fi
+		else
+			((errnum++))
+			result="${result} warn slave status not detected, maybe slave not running"
+		fi
+	fi
+
+	if [ -n "${result}" ]; then
+		echo "${mysql_host}:${mysql_port} ${result}"
+	fi
+  done
+}
+
+check

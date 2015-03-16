@@ -1,0 +1,80 @@
+#!/usr/bin/env bash
+
+show_help(){
+cat <<EOF
+Argument: {ipaddr-list}
+Example:  "118.194.236.35 1.1.1.1 8.8.8.8"
+
+Output:
+{ipaddr} warn {dnsbl_server} {block_reason1} {block_reason2} ...
+{ipaddr} succ {dnsbl_server}
+
+Example:
+118.194.236.35 warn zen.spamhaus.org "http://www.spamhaus.org/query/bl?ip=118.194.236.35" 
+8.8.8.8 succ zen.spamhaus.org
+EOF
+exit 0;
+}
+[ "$1" == "help" -o "$1" == "h" ] && show_help;
+
+
+dnsbl_server="zen.spamhaus.org"
+time_out=10
+exposed_addr=$1
+
+# if null return STATE_UNKN.
+
+# if null or invalid set default.
+[ -z "${dns_check_lst}" ] && dns_check_lst="eyou.net:mx,ns"
+
+# is_ipaddr function here
+is_ipaddr() {
+	echo "${1}" | grep -E -q "^(([0-9]|([1-9][0-9])|(1[0-9]{2})|(2([0-4][0-9]|5[0-5])))\.){3}([1-9]|([1-9][0-9])|(1[0-9]{2})|(2([0-4][0-9]|5[0-5])))$"
+}
+
+# check function here
+check(){
+
+  if [ -f "/usr/bin/dig" ] && [ -x "/usr/bin/dig" ]; then
+	:
+  else
+	return
+  fi
+
+  if [ -z "${exposed_addr}" ]; then
+        return
+  fi
+
+  for x in `echo "${exposed_addr}"`
+  do
+	if ! is_ipaddr "${x}"; then
+		continue
+	fi
+	
+	convertip=$( (echo -e "${x}" | /bin/awk 'BEGIN{FS=".";OFS="."} {print $4,$3,$2,$1}')  2>&- )
+	for y in `echo "${dnsbl_server}"`
+	do
+		queryname="${convertip}.${y}"
+		response=$( /usr/bin/dig +short +time="${time_out}" A "${queryname}" 2>&1 )
+		if [ $? -ne 0 ]; then
+			continue
+		else
+			if [ -n "${response}" ]; then
+				if (echo "${response}" | grep -E -q "^127.") >/dev/null 2>&1; then
+					echo -en "${x} warn ${y} \c"
+					reason=$( /usr/bin/dig +short +time="${time_out}" TXT "${queryname}" 2>/dev/null )
+					if [ -n "${reason}" ]; then
+						reason=$(echo -e "${reason}" |tr '\n' ' ')
+						echo -en "${reason}\c"
+					fi
+					echo -en "\n"
+				else
+					echo -en "${x} succ ${y}\n"
+				fi
+			fi
+		fi
+	done
+  done
+}
+
+check

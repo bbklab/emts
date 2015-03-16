@@ -1,0 +1,58 @@
+#!/usr/bin/env bash
+
+show_help(){
+cat <<EOF
+Arguments:  {mysqlcli_path}  {ip,port,user,pass,dbname}
+Usage:
+
+Output:
+succ {total} {details}
+warn {sqlerror}
+Example:
+EOF
+exit 0;
+}
+[ "$1" == "help" -o "$1" == "h" ] && show_help;
+
+mysqlcli_path=$1
+mysql_conn_conf=$2
+mysql_time_out=5
+
+[ -z "${mysqlcli_path}" ] && mysqlcli_path="/usr/local/eyou/mail/opt/mysql/bin/mysql"
+[ -z "${mysql_conn_conf}" ] && mysql_conn_conf="127.0.0.1,3306,eyou,eyou,eyou_mail"
+
+check(){
+
+  sepnum=$(echo -e "${mysql_conn_conf}" | /bin/awk -F"," 'END{print --NF}')
+  if [ "${sepnum}" != "4" ]; then
+        return
+  else
+        mysql_host="$(echo -e "${mysql_conn_conf}"|/bin/awk -F"," '{print $1}')"
+        mysql_port="$(echo -e "${mysql_conn_conf}"|/bin/awk -F"," '{print $2}')"
+        mysql_user="$(echo -e "${mysql_conn_conf}"|/bin/awk -F"," '{print $3}')"
+        mysql_pass="$(echo -e "${mysql_conn_conf}"|/bin/awk -F"," '{print $4}')"
+        database="$(echo -e "${mysql_conn_conf}"|/bin/awk -F"," '{print $5}')"
+        if [ -z "${mysql_pass}" ]; then
+                mysql="${mysqlcli_path} -h ${mysql_host} -P ${mysql_port} -u${mysql_user} --connect-timeout ${mysql_time_out}  -D ${database} "
+        else
+                mysql="${mysqlcli_path} -h ${mysql_host} -P ${mysql_port} -u${mysql_user} -p${mysql_pass} --connect-timeout ${mysql_time_out} -D ${database} "
+        fi
+  fi
+
+  local gearman_queue_tmpfile="/var/tmp/.${0##*/}.queuegroup.num.tmp"
+  sqlerror=$( ${mysql} -s -e " SELECT COUNT(function_name),function_name FROM gearman_queue GROUP BY 2; " 2>&1 1>"${gearman_queue_tmpfile}" )
+  rc=$?
+  sqlerror=$( (echo -e "${sqlerror}" | sed -e '/password on the command line/d' |tr -d '\r\n') 2>&- )
+  if [ $rc -eq 0 ]; then
+  	local total=0 details=
+	if [ -f "${gearman_queue_tmpfile}" ] && [ -s "${gearman_queue_tmpfile}" ]; then
+		total=$( cat "${gearman_queue_tmpfile}" | /bin/awk '{x+=$1} END{print x}' )
+		details=$( (cat "${gearman_queue_tmpfile}" | /bin/sort -rn | head -n 10 | /bin/awk '{printf "%s:%s,",$1,$2}' | tr -d '\n') 2>&- )
+	fi
+	echo "succ ${total} ${details}"
+  else
+	echo "warn ${sqlerror}"
+  fi
+}
+
+check
