@@ -37,6 +37,9 @@ our $maillicense_decoder = $dirname . '/mail_license.php';
 use constant EYOUMAIL_INST  => '/usr/local/eyou/mail';
 use constant EYOUMAIL_ETC   => EYOUMAIL_INST . '/etc';
 use constant EYOUMAIL_CFG   => EYOUMAIL_ETC  . '/eyou_mail.ini';
+use constant EYOUMAIL_OPT   => EYOUMAIL_INST . '/opt';
+use constant EYOUMAIL_INC   => (-d EYOUMAIL_INST . '/app/inc/') ? (EYOUMAIL_INST . '/app/inc/') : (EYOUMAIL_INST . '/inc/');
+use constant EYOUMAIL_REALCFG_JSON => (-f EYOUMAIL_INC . '/dynamic/config.php') ? EYOUMAIL_INC . '/dynamic/config.json' : '';
 
 use constant EYOUGATE_INST  => '/var/emdg';
 use constant EYOUGATE_ETC   => EYOUGATE_INST . '/etc';
@@ -190,6 +193,71 @@ if (-f $mail_initctrl && -x $mail_initctrl) {
 	}
 }
 
+# get mail_tools
+my %mail_tools = (
+	'mysqlcli'	=> (-f EYOUMAIL_OPT . '/mysql/bin/mysql') ? EYOUMAIL_OPT . '/mysql/bin/mysql' : '',
+	'mysqladmin'	=> (-f EYOUMAIL_OPT . '/mysql/bin/mysqladmin') ? EYOUMAIL_OPT . '/mysql/bin/mysqladmin' : '',
+);
+
+# get mail_config
+my %mail_config = ();
+if (EYOUMAIL_REALCFG_JSON ne '') {
+	my $mail_config_json = undef;
+	my $mail_config = undef;
+	if (open my $fh, "<", EYOUMAIL_REALCFG_JSON) {
+		$mail_config_json = <$fh>;
+		chomp($mail_config_json);
+		close $fh if $fh;
+        	eval { $mail_config = JSON->new->allow_nonref->utf8(1)->ascii(1)->decode($mail_config_json); };
+        	unless ($@) {
+                	%mail_config = &filter_mail_config($mail_config)
+        	}
+	}
+}
+
+sub filter_mail_config {
+	my $full_configs = $_[0];
+	my %full_configs = %{$full_configs};
+	my %wanted_filed = (
+		'common'	=>  [ qw( 
+					server_me  session_lifetime password_encode_algo timezone login_ssl
+					smtp_rcpt_num smtp_relayhost remote_helo_host remote_smtproute
+					remote_relay_domain remote_enable_replace_domain remote_replace_domain )
+				    ],
+		'usrdb'		=> [ qw( db_mysql_user db_mysql_pass db_mysql_host db_mysql_port db_name
+					mta_db_mysql_user mta_db_mysql_pass mta_db_mysql_host mta_db_mysql_port
+					)
+				   ] ,
+		'idxdb'		=> [ qw(
+					dbumi_mysql_user dbumi_mysql_pass dbumi_mysql_dsn
+					mta_dbumi_mysql_user mta_dbumi_mysql_pass mta_dbumi_mysql_dsn 
+					)
+				   ],
+		'logdb'		=> [ qw(
+					dblog_mysql_user dblog_mysql_pass dblog_mysql_host dblog_mysql_port dblog_name
+					)
+				   ],
+		
+		'memcache'	=> [ qw(memcache_session memcache_fix memcache_hot) ],
+		'filed'		=> [ qw(filed_host filed_port) ],
+		'ecs'		=> [ qw(ecs_host ecs_port) ],
+		'search'	=> [ qw(search_host search_port) ],
+		'plggw'		=> [ qw(
+					plugin_gw_sso_host plugin_gw_sso_port plugin_gw_sso_token 
+					plugin_gw_sync_bwlist_host plugin_gw_sync_bwlist_port
+					)
+				   ],
+	);
+	my %wanted_configs = ();
+	foreach my $a (keys %wanted_filed) {
+		foreach my $b (@{$wanted_filed{$a}}) {
+			$wanted_configs{$a}{$b} = $full_configs{$b};
+		}
+	}
+	
+	return %wanted_configs
+}
+
 # get gw version
 my $gw_version = undef;
 my $gw_version_ini = EYOUGATE_ETC . '/version.ini';
@@ -329,6 +397,8 @@ if (-f $mail4_scriptd) {
         'license'		=> \%mail_license,
 	'serial'		=> $mail_serial,
 	'startups'		=> \@mail_startups,
+	'tools'			=> \%mail_tools,
+	'config'		=> \%mail_config,
 );
 
 %gw = (
