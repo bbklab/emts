@@ -1,0 +1,205 @@
+#!/usr/bin/env perl
+
+our $basedir = '/usr/local/esop/agent/mole';
+our $mole = "$basedir/sbin/mole";
+
+BEGIN {
+  my $basedir = '/usr/local/esop/agent/mole';
+  my $pllib_dir = "$basedir/opt/plmods";
+  my @incs = (    # set additional path
+        # rhel5 32bit
+        $pllib_dir.'/lib/perl5/',
+        $pllib_dir.'/lib/perl5/5.8.8/',
+        $pllib_dir.'/lib/perl5/site_perl/',
+        $pllib_dir.'/lib/perl5/site_perl/5.8.8/',
+        # rhel5 64bit
+        $pllib_dir.'/lib64/perl5/',
+        $pllib_dir.'/lib64/perl5/5.8.8/',
+        $pllib_dir.'/lib64/perl5/site_perl/',
+        $pllib_dir.'/lib64/perl5/site_perl/5.8.8/',
+        # rhel6 32bit
+        $pllib_dir.'/lib/perl5/',
+	$pllib_dir.'/share/perl5/',
+        # rhel6 64bit
+        $pllib_dir.'/lib64/perl5/',
+	$pllib_dir.'/share/perl5/',
+  );
+
+  push @INC, @incs;
+};
+
+use strict;
+use warnings;
+use utf8;
+use Locale::Messages qw (textdomain bindtextdomain gettext nl_putenv :locale_h :libintl_h);
+use POSIX qw (setlocale);
+binmode(STDIN, ":encoding(utf8)");
+binmode(STDOUT, ":encoding(utf8)");
+binmode(STDERR, ":encoding(utf8)");
+binmode STDOUT, ':raw';
+
+$SIG{'PIPE'} = 'IGNORE';
+
+# return codes
+our ($state_succ,$state_warn,$state_crit,$state_unkn,$state_noop,$state_notify) = (0,1,2,3,4,5);
+
+# return stuff
+our ($rc, $result) = (0,'');
+
+our $filename = (split /\//, __FILE__)[-1];
+our $tracefile = "/var/tmp/$filename.trace";
+
+# check mole 
+unless (-f $mole && -x $mole) {
+  printf "{unkn}:{str}:{$mole not prepared.}";
+  exit $state_unkn;
+}
+
+# read mole locale_def
+our $localdir = "$basedir/share/locale/";
+open my $fh, "$mole printdef LOCALE_DIR 2>&- |";
+if($fh){
+  while(<$fh>){
+        chomp; $localdir = $_;
+        last;
+  }
+}
+
+# read plugin locale setting
+our $locale = 'zh_CN.UTF-8';
+open $fh, "$mole view $filename locale 2>&- |";
+if($fh){
+  while(<$fh>){
+        chomp; $locale = $_;
+        last;
+  }
+  if(!defined $locale || $locale eq ''){
+        open my $fh1, "$mole view default locale 2>&- |";
+        if($fh1){
+                while(<$fh1>){
+                        chomp; $locale = $_;
+                        last;
+                }
+        }
+  }
+}
+if(!defined $locale || $locale eq ''){
+        $locale = 'zh_CN.UTF-8';
+}elsif($locale eq 'zh_CN' || $locale eq 'zh_CN.UTF-8' || $locale eq 'zh'){
+        $locale = 'zh_CN.UTF-8';
+}elsif($locale eq 'en_US' || $locale eq 'en_US.UTF-8' || $locale eq 'en'){
+        $locale = 'en_US.UTF-8';
+}else{
+        $locale = 'zh_CN.UTF-8';
+}
+setlocale(LC_ALL,$locale);
+nl_putenv("LANGUAGE=$locale");
+nl_putenv("LANG=$locale");
+
+# set textdomain; bindtextdomain
+sub _ ($) { &gettext; }
+textdomain "$filename";
+bindtextdomain "$filename", "$localdir";
+
+# read plugin config here
+our $messagefile_default = '/var/log/messages';
+our $messagefile = '';
+open $fh, "$mole view $filename messagefile 2>&- |";
+if ($fh) {
+  while(<$fh>){
+  	chomp; $messagefile = $_;
+	last;
+  }
+}
+if (!$messagefile) {
+  my ($el5_file,$el6_file,$syslog_conf) = ('/etc/syslog.conf','/etc/rsyslog.conf','');
+  $syslog_conf = (-f $el5_file) ? $el5_file : $el6_file;
+  if (-f $syslog_conf){
+	if (open my $fh0, "<", $syslog_conf) {
+		while(<$fh0>){
+			next if m/\A\s*#/;
+			if (m/\*\.info/i){
+				$messagefile = (split/\s+/)[-1];
+				last;
+			}
+		}
+		close $fh0 if ($fh0);
+	}
+  }
+}
+$messagefile = (!$messagefile) ? $messagefile_default : $messagefile;
+
+# define dev, inode, position for {messagefile}
+our ($dev, $inode, $position) = ();
+
+# define savepos
+sub savepos {
+  my ($messagefile, $position, $tracefile) = @_;
+  if (open FH, ">$tracefile") {
+  	($dev, $inode) = (stat $messagefile)[0,1];
+	print FH "$dev $inode $position";
+	close FH;
+  } else {
+	return undef;
+  }
+}
+
+# define loadpos
+sub loadpos {
+  my $tracefile = shift;
+  if (open FH, "<$tracefile") {
+	while (<FH>) {
+  		($dev, $inode, $position) = (split /\s+/)[0,1,2];
+		last;
+	}
+	close FH;
+  }
+}
+
+# Main body begin
+unless (-f $messagefile) {
+  printf _"{unkn}:{str}:{ message file [%s] not exists. }",$messagefile;
+  exit $state_unkn;
+}
+# 1. load position from tracefile
+loadpos ($tracefile);
+unless ($dev && $inode && $position) {  # maybe first running
+  savepos ($messagefile,0,$tracefile);	# save position again
+  loadpos ($tracefile);			# load position again
+}
+# 2. read file dev,inode, checking rotated or not ?
+my ($nowdev, $nowinode) = (stat $messagefile)[0,1];
+if ($dev ne $nowdev || $inode ne $nowinode) {	# maybe messagefile logrotated
+  savepos ($messagefile,0,$tracefile);		# save position again
+  loadpos ($tracefile);				# load position again
+}
+# 3. open message file and goto last position directly
+unless (open FH, "<$messagefile") {
+  printf _"{unkn}:{str}:{ open message file [%s] failed. }",$messagefile;
+  exit $state_unkn;
+}
+seek (FH,$position,0);		# directly goto last position
+# 4. scan message file record
+my @record = ();
+while (<FH>) {
+  chomp;
+  if (m/Out of Memory/i || m/oom-killer/i) {
+	push @record,  "<font color=red>$_</font> ###";
+  }
+}
+# 5. read nower position and save again.
+my $newpos = tell(FH);
+savepos ($messagefile, $newpos, $tracefile);
+close FH;
+# 6. prepare last output
+unless (@record) {
+  printf _"{succ}:{str}:{no oom event captured}";
+  exit $state_succ;
+} else {
+  while (@record) {
+  	$result .= shift @record;
+  }
+  $result = sprintf(_"oom event | captured oom event | ") . $result;
+  printf _"{crit}:{str}:{%s}",$result;
+  exit $state_crit;
+}

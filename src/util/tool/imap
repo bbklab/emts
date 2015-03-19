@@ -1,0 +1,106 @@
+#!/usr/bin/env perl
+
+BEGIN {
+  my @incs = ();    # set additional path
+  push @INC, @incs;
+};
+
+use strict;
+use warnings;
+use utf8;
+use IO::Socket;
+use IO::Socket::INET;
+# use Smart::Comments;
+binmode(STDIN, ":encoding(utf8)");
+binmode(STDOUT, ":encoding(utf8)");
+binmode(STDERR, ":encoding(utf8)");
+binmode STDOUT, ':raw';
+
+$SIG{'PIPE'} = 'IGNORE';
+
+$| = 1;
+
+unless (scalar @ARGV) {
+  exit (0);
+}
+
+our $addr_port = $ARGV[0];
+our $time_out = 5;
+
+my @addr_pair = split /\s+/, $addr_port;
+while(@addr_pair) {
+  my ($imap_host, $imap_port, $imap_user, $imap_pass) = (split /,/, shift @addr_pair)[0,1,2,3];
+  if (!defined $imap_host || !defined $imap_port) {
+	next;
+  }
+  if ($imap_port =~ /\D/) {
+	next;
+  }
+
+  ### $imap_host
+  ### $imap_port
+  ### $imap_user
+  ### $imap_pass
+
+  my $address = $imap_host . ':' . $imap_port;
+  my $imap=IO::Socket::INET->new(
+	PeerAddr =>	$imap_host,
+	PeerPort => 	$imap_port,
+	Proto	 =>	'tcp',
+	Timeout =>	$time_out,
+  );
+  if (! defined $imap) {
+	if ($@) {
+		$@ =~ s/[\r\n]//g;
+		printf("%s warn %s\n", $address, $@);
+	} else {
+		printf("%s warn connect error\n", $address);
+	}
+	next;
+  }
+
+  my $welcome = <$imap>;
+  ### $welcome
+
+  if ($welcome && $welcome ne '') {
+	$welcome =~ s/[\r\n]//g;
+  }
+  unless (defined $welcome && $welcome =~ m/\A.\s+OK\s+/) {
+	if ($welcome && $welcome ne '') {
+		printf("%s warn %s\n", $address, $welcome);
+	} else {
+		printf("%s warn welcome banner empty\n", $address);
+	}
+	next;
+  }
+
+  print $imap "A01 NOOP\r\n";
+  my $response = <$imap>;
+  ### $response
+
+  if ($response && $response ne '') {
+	$response =~ s/[\r\n]//g;
+  }
+  unless (defined $response && $response =~ m/\AA01\s+OK\s+/i) {
+	$response = '' if (!defined $response);
+        printf("%s warn %s\n", $address, $response);
+	next;
+  } 
+
+  if($imap_user && $imap_pass) {
+	print $imap "A01 LOGIN $imap_user $imap_pass\r\n";
+	my $response = <$imap>;
+	### $response
+
+  	if ($response && $response ne '') {
+		$response =~ s/[\r\n]//g;
+  	}
+	unless ($response && $response =~ m/\AA01\s+OK\s+/i) {
+		$response = '' if (!defined $response);
+		printf("%s warn %s\n", $address, $response);
+		next;
+	} 
+  } 
+
+  printf("%s succ\n", $address)
+}
