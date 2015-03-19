@@ -3,7 +3,8 @@
 show_help(){
 cat <<EOF
 Arguments:   {mysqladmin_path}  {ip,port,user,pass  ip,port,user,pass  ...}
-Usage:       /opt/mysql/bin/mysqladmin  "127.0.0.1,3306,eyou,eyou 127.0.0.1,3316,eyou,eyou"
+Arguments:   {mysqladmin_path}  {unixsock1,user,pass  unixsock2,user,pass  ...}
+Usage:       /usr/local/eyou/mail/opt/mysql/bin/mysqladmin "/usr/local/eyou/mail/run/em_mysql.sock,eyou,eyou 127.0.0.1,3316,eyou,eyou"
 
 Output:   
 {ip:port} succ
@@ -35,26 +36,34 @@ check() {
   for pairs in `echo "${mysql_conn_conf}"`
   do
 	sepnum=$(echo -e "${pairs}" | /bin/awk -F"," 'END{print --NF}')
-	if [ "${sepnum}" != "3" ]; then
-		continue 1
-	fi
 
-  	mysql_host="$(echo -e "${pairs}"|/bin/awk -F"," '{print $1}')"
-  	mysql_port="$(echo -e "${pairs}"|/bin/awk -F"," '{print $2}')"
-  	mysql_user="$(echo -e "${pairs}"|/bin/awk -F"," '{print $3}')"
-  	mysql_pass="$(echo -e "${pairs}"|/bin/awk -F"," '{print $4}')"
-	if [ -z "${mysql_pass}" ]; then
-		cmd="${mysqladmin_path} -h ${mysql_host} -P ${mysql_port} -u${mysql_user} --connect-timeout ${mysql_time_out} "
-	else
-		cmd="${mysqladmin_path} -h ${mysql_host} -P ${mysql_port} -u${mysql_user} -p"${mysql_pass}" --connect-timeout ${mysql_time_out} "
-	fi
+  	if [ "${sepnum}" == "3" ]; then
+  		mysql_host="$(echo -e "${pairs}"|/bin/awk -F"," '{print $1}')"
+  		mysql_port="$(echo -e "${pairs}"|/bin/awk -F"," '{print $2}')"
+  		mysql_user="$(echo -e "${pairs}"|/bin/awk -F"," '{print $3}')"
+  		mysql_pass="$(echo -e "${pairs}"|/bin/awk -F"," '{print $4}')"
+		mysql_addr="${mysql_host}:${mysql_port}"
+        	cmd="${mysqladmin_path} -h ${mysql_host} -P ${mysql_port} -u${mysql_user} --connect-timeout ${mysql_time_out} "
+  	elif [ "${sepnum}" == "2" ]; then
+  		unixsocket="$(echo -e "${pairs}"|/bin/awk -F"," '{print $1}')"
+  		mysql_user="$(echo -e "${pairs}"|/bin/awk -F"," '{print $2}')"
+  		mysql_pass="$(echo -e "${pairs}"|/bin/awk -F"," '{print $3}')"
+		mysql_addr="${unixsocket}"
+        	cmd="${mysqladmin_path} -S ${unixsocket} -u${mysql_user} --connect-timeout ${mysql_time_out} "
+  	else
+        	return
+  	fi
+  	if [ -n "${mysql_pass}" ]; then
+        	cmd="${cmd} -p${mysql_pass} "
+  	fi
+
 
 	ping_result=$( ${cmd} ping 2>&1 )
 	ping_result=$( (echo -e "${ping_result}" | sed -e '/password on the command line/d' |tr -d '\r\n') 2>&- )
 	if [ "$(echo "${ping_result}"|grep -E -o -i "is alive")" == "" ]; then
-		echo "${mysql_host}:${mysql_port} warn ${ping_result}"
+		echo "${mysql_addr} warn ${ping_result}"
 	else
-		echo "${mysql_host}:${mysql_port} succ"
+		echo "${mysql_addr} succ"
 	fi
   done
 }

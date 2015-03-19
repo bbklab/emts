@@ -3,7 +3,9 @@
 show_help(){
 cat <<EOF
 Arguments:  {mysqlcli_path}  {ip,port,user,pass,dbname}
-Usage:
+Arguments:  {mysqlcli_path}  {unixsock,user,pass,dbname}
+Usage:  /usr/local/eyou/mail/opt/mysql/bin/mysql "/usr/local/eyou/mail/run/em_mysql.sock,eyou,eyou,eyou_mail" 
+Usage:  /usr/local/eyou/mail/opt/mysql/bin/mysql "127.1,3306,eyou,eyou,eyou_mail" 
 
 Output:
 succ {total} {details}
@@ -30,19 +32,24 @@ check(){
   fi
 
   sepnum=$(echo -e "${mysql_conn_conf}" | /bin/awk -F"," 'END{print --NF}')
-  if [ "${sepnum}" != "4" ]; then
-        return
-  fi
-
-  mysql_host="$(echo -e "${mysql_conn_conf}"|/bin/awk -F"," '{print $1}')"
-  mysql_port="$(echo -e "${mysql_conn_conf}"|/bin/awk -F"," '{print $2}')"
-  mysql_user="$(echo -e "${mysql_conn_conf}"|/bin/awk -F"," '{print $3}')"
-  mysql_pass="$(echo -e "${mysql_conn_conf}"|/bin/awk -F"," '{print $4}')"
-  database="$(echo -e "${mysql_conn_conf}"|/bin/awk -F"," '{print $5}')"
-  if [ -z "${mysql_pass}" ]; then
+  if [ "${sepnum}" == "4" ]; then
+  	mysql_host="$(echo -e "${mysql_conn_conf}"|/bin/awk -F"," '{print $1}')"
+  	mysql_port="$(echo -e "${mysql_conn_conf}"|/bin/awk -F"," '{print $2}')"
+  	mysql_user="$(echo -e "${mysql_conn_conf}"|/bin/awk -F"," '{print $3}')"
+  	mysql_pass="$(echo -e "${mysql_conn_conf}"|/bin/awk -F"," '{print $4}')"
+  	database="$(echo -e "${mysql_conn_conf}"|/bin/awk -F"," '{print $5}')"
 	mysql="${mysqlcli_path} -h ${mysql_host} -P ${mysql_port} -u${mysql_user} --connect-timeout ${mysql_time_out}  -D ${database} "
+  elif [ "${sepnum}" == "3" ]; then
+  	unixsocket="$(echo -e "${mysql_conn_conf}"|/bin/awk -F"," '{print $1}')"
+  	mysql_user="$(echo -e "${mysql_conn_conf}"|/bin/awk -F"," '{print $2}')"
+  	mysql_pass="$(echo -e "${mysql_conn_conf}"|/bin/awk -F"," '{print $3}')"
+  	database="$(echo -e "${mysql_conn_conf}"|/bin/awk -F"," '{print $4}')"
+	mysql="${mysqlcli_path} -S ${unixsocket} -u${mysql_user} --connect-timeout ${mysql_time_out}  -D ${database} "
   else
-	mysql="${mysqlcli_path} -h ${mysql_host} -P ${mysql_port} -u${mysql_user} -p${mysql_pass} --connect-timeout ${mysql_time_out} -D ${database} "
+       	return
+  fi
+  if [ -n "${mysql_pass}" ]; then
+	mysql="${mysql} -p${mysql_pass} "
   fi
 
   local gearman_queue_tmpfile="/var/tmp/.${0##*/}.queuegroup.num.tmp"
