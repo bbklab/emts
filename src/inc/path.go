@@ -14,3 +14,7 @@ func GetAppRealPath() string {
 	}
 	return ""
 }
+
+func GetAppRealDirPath() string {
+	return filepath.Dir(GetAppRealPath()) // return  .  on the worst
+}
