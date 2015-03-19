@@ -22,8 +22,8 @@ mysqlcli_path="$1"
 mysql_conn_conf="$2"
 mysql_time_out=5
 
-[ -z "${mysqlcli_path}" ] && mysqlcli_path="/usr/local/eyou/mail/opt/mysql/bin/mysql"
-[ -z "${mysql_conn_conf}" ] && mysql_conn_conf="127.0.0.1,3306,eyou,eyou"
+[ -z "${mysqlcli_path}" ] && exit 0 # mysqlcli_path="/usr/local/eyou/mail/opt/mysql/bin/mysql"
+[ -z "${mysql_conn_conf}" ] && exit 0 # mysql_conn_conf="127.0.0.1,3306,eyou,eyou"
 
 check() {
 
