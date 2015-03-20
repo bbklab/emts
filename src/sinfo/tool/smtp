@@ -17,8 +17,29 @@ $SIG{'PIPE'} = 'IGNORE';
 
 $| = 1;
 
+sub show_help {
+print <<EOF
+Arguments:    {smtp_addr}
+Usage:   "127.0.0.1,25,zz\@eyou.net,zzpassword  gateway.eyou.net,25,eyou,eyou"
+
+Output:   
+{url} succ
+{url} warn http_code
+
+Example:
+http://127.0.0.1:80/index.php succ
+https://mail.eyou.net:443/a.html warn 400
+EOF
+;
+exit (0);
+}
+
 unless (scalar @ARGV) {
   exit (0);
+}
+
+if ($ARGV[0] eq 'h') {
+  show_help;
 }
 
 our $addr_port = $ARGV[0];
@@ -53,82 +74,103 @@ while(@addr_pair) {
 	next;
   }
 
-  my $welcome = <$smtp>;
-  if ($welcome && $welcome ne '') {
-	$welcome =~ s/[\r\n]//g;
-  }
-  unless ($welcome && $welcome =~ m/\A2\d\d\s+/) {
-	if ($welcome && $welcome ne '') {
-		printf("%s warn %s\n", $address, $welcome);
-	} else {
-		printf("%s warn welcome banner empty\n", $address);
-	}
-  	next;
-  }
-  
-  print $smtp "HELO $helo_me\r\n";
-  my $response = <$smtp>;
-  if ($response && $response ne '') {
-       $response =~ s/[\r\n]//g;
-  }
-  unless ($response && $response =~ m/\A2\d\d\s+/) {
-	$response = '' if (!defined $response);
-	printf ("%s warn %s\n", $address, $response);
-	next;
-  } 
-
-  print $smtp "NOOP\r\n";
-  $response = <$smtp>;
-  if ($response && $response ne '') {
-       $response =~ s/[\r\n]//g;
-  }
-  unless ($response && $response =~ m/\A2\d\d\s+/) {
-	$response = '' if (!defined $response);
-	printf ("%s warn %s\n", $address, $response);
-	next;
-  }
-
-  if($smtp_user && $smtp_pass) {
-	my ($encode_smtp_user, $encode_smtp_pass);
-	$encode_smtp_user = encode_base64($smtp_user,'');	# trim '\n', empty eof
-	$encode_smtp_pass = encode_base64($smtp_pass,'');	# trim '\n', empty eof
-	unless ($smtp_user && $smtp_pass) {
-		next;	
-	}
-
-	print $smtp "AUTH LOGIN\r\n";
-	$response = <$smtp>;
-	if ($response && $response ne '') {
-		$response =~ s/[\r\n]//g;
-	}
-	unless (defined $response && $response =~ m/\A3\d\d\s+/) {
-		$response = '' if (!defined $response);
-		printf("%s warn %s\n", $address, $response);
-		next;
-	}
+  # run all process in a eval{} with alarm(5)
+  eval {
+	  local $SIG{'ALRM'} = sub { die 'Running Timed Out'; };
+	  alarm(5);
 	
-	print $smtp "$encode_smtp_user\r\n";
-	$response = <$smtp>;
-	if ($response && $response ne '') {
-		$response =~ s/[\r\n]//g;
-	}
-	unless (defined $response && $response =~ m/\A3\d\d\s+/) {
+	  my $welcome = <$smtp>;
+	  if ($welcome && $welcome ne '') {
+		$welcome =~ s/[\r\n]//g;
+	  }
+	  unless ($welcome && $welcome =~ m/\A2\d\d\s+/) {
+		if ($welcome && $welcome ne '') {
+			printf("%s warn %s\n", $address, $welcome);
+		} else {
+			printf("%s warn welcome banner empty\n", $address);
+		}
+	  	goto BREAK;
+	  }
+	  
+	  print $smtp "HELO $helo_me\r\n";
+	  my $response = <$smtp>;
+	  if ($response && $response ne '') {
+	       $response =~ s/[\r\n]//g;
+	  }
+	  unless ($response && $response =~ m/\A2\d\d\s+/) {
 		$response = '' if (!defined $response);
 		printf ("%s warn %s\n", $address, $response);
-		next;
-	} 
+		goto BREAK;
+	  } 
+	
+	  print $smtp "NOOP\r\n";
+	  $response = <$smtp>;
+	  if ($response && $response ne '') {
+	       $response =~ s/[\r\n]//g;
+	  }
+	  unless ($response && $response =~ m/\A2\d\d\s+/) {
+		$response = '' if (!defined $response);
+		printf ("%s warn %s\n", $address, $response);
+		goto BREAK;
+	  }
+	
+	  if($smtp_user && $smtp_pass) {
+		my ($encode_smtp_user, $encode_smtp_pass);
+		$encode_smtp_user = encode_base64($smtp_user,'');	# trim '\n', empty eof
+		$encode_smtp_pass = encode_base64($smtp_pass,'');	# trim '\n', empty eof
+		unless ($smtp_user && $smtp_pass) {
+			goto BREAK;	
+		}
+	
+		print $smtp "AUTH LOGIN\r\n";
+		$response = <$smtp>;
+		if ($response && $response ne '') {
+			$response =~ s/[\r\n]//g;
+		}
+		unless (defined $response && $response =~ m/\A3\d\d\s+/) {
+			$response = '' if (!defined $response);
+			printf("%s warn %s\n", $address, $response);
+			goto BREAK;
+		}
+		
+		print $smtp "$encode_smtp_user\r\n";
+		$response = <$smtp>;
+		if ($response && $response ne '') {
+			$response =~ s/[\r\n]//g;
+		}
+		unless (defined $response && $response =~ m/\A3\d\d\s+/) {
+			$response = '' if (!defined $response);
+			printf ("%s warn %s\n", $address, $response);
+			goto BREAK;
+		} 
+	
+		print $smtp "$encode_smtp_pass\r\n";
+		$response = <$smtp>;
+		if ($response && $response ne '') {
+			$response =~ s/[\r\n]//g;
+		}
+		unless (defined $response && $response =~ m/\A2\d\d\s+/) {
+			$response = '' if (!defined $response);
+			printf ("%s warn %s\n", $address, $response);
+			goto BREAK;
+		} 
+	  }
+	  alarm(0);
+  };
+  alarm(0);
 
-	print $smtp "$encode_smtp_pass\r\n";
-	$response = <$smtp>;
-	if ($response && $response ne '') {
-		$response =~ s/[\r\n]//g;
+  if ($@) {
+	$@ =~ s/[\r\n]//g;
+	if ($@ =~ m/Running Timed Out/) {
+  		printf ("%s warn timeout\n", $address);
+	} else {
+		printf ("%s warn %s\n", $address, $@);
 	}
-	unless (defined $response && $response =~ m/\A2\d\d\s+/) {
-		$response = '' if (!defined $response);
-		printf ("%s warn %s\n", $address, $response);
-		next;
-	} 
+  } else {
+  	printf ("%s succ\n", $address );
   }
 
-  printf ("%s succ\n", $address );
+  BREAK: {
+	next;
+  }
 }
