@@ -31,7 +31,7 @@ our ($rc, $result) = (0,'');
 # defined filename, dirname, mail_licensedecoder
 our $filename = (split /\//, __FILE__)[-1];
 our $dirname  = dirname(rel2abs(__FILE__));
-our $maillicense_decoder = $dirname . '/mail_license.php';
+our $maillicense_decoder = $dirname . '/emlicense';
 
 # define EYOU_XXX
 use constant EYOUMAIL_INST  => '/usr/local/eyou/mail';
@@ -210,52 +210,66 @@ if (EYOUMAIL_REALCFG_JSON ne '') {
 		close $fh if $fh;
         	eval { $mail_config = JSON->new->allow_nonref->utf8(1)->ascii(1)->decode($mail_config_json); };
         	unless ($@) {
-                	%mail_config = &filter_mail_config($mail_config)
+                	%mail_config = &fill_mail_config($mail_config)
         	}
 	}
 }
 
-sub filter_mail_config {
+sub fill_mail_config {
 	my $full_configs = $_[0];
 	my %full_configs = %{$full_configs};
+
+	# 0. init result configs
+	my %result_configs = ();
+
+	# 1. fill with wanted configs
 	my %wanted_filed = (
-		'common'	=>  [ qw( 
+		# common configs
+		'common'	=> [ qw( 
 					server_me  session_lifetime password_encode_algo timezone login_ssl
 					smtp_rcpt_num smtp_relayhost remote_helo_host remote_smtproute
 					remote_relay_domain remote_enable_replace_domain remote_replace_domain )
-				    ],
+				   ],
+		# how to connect user mysql server
 		'usrdb'		=> [ qw( db_mysql_user db_mysql_pass db_mysql_host db_mysql_port db_name
 					mta_db_mysql_user mta_db_mysql_pass mta_db_mysql_host mta_db_mysql_port
 					)
-				   ] ,
+				   ],
+		# how to connect index mysql server
 		'idxdb'		=> [ qw(
 					dbumi_mysql_user dbumi_mysql_pass dbumi_mysql_dsn
 					mta_dbumi_mysql_user mta_dbumi_mysql_pass mta_dbumi_mysql_dsn 
 					)
 				   ],
+		# how to connect log mysql server
 		'logdb'		=> [ qw(
 					dblog_mysql_user dblog_mysql_pass dblog_mysql_host dblog_mysql_port dblog_name
 					)
 				   ],
-		
+		# how to connect memcache server
 		'memcache'	=> [ qw(memcache_session memcache_fix memcache_hot) ],
+		# how to connect filed server
 		'filed'		=> [ qw(filed_host filed_port) ],
+		# how to connect ecs server
 		'ecs'		=> [ qw(ecs_host ecs_port) ],
+		# how to connect searchd server
 		'search'	=> [ qw(search_host search_port) ],
+		# combination about plugin gw
 		'plggw'		=> [ qw(
 					plugin_gw_sso_host plugin_gw_sso_port plugin_gw_sso_token 
 					plugin_gw_sync_bwlist_host plugin_gw_sync_bwlist_port
 					)
 				   ],
 	);
-	my %wanted_configs = ();
 	foreach my $a (keys %wanted_filed) {
 		foreach my $b (@{$wanted_filed{$a}}) {
-			$wanted_configs{$a}{$b} = $full_configs{$b};
+			$result_configs{$a}{$b} = $full_configs{$b};
 		}
 	}
 	
-	return %wanted_configs
+	# 2. fill with other compent configs
+
+	return %result_configs
 }
 
 # get gw version
