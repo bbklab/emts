@@ -24,6 +24,7 @@ $| = 1;
 our $filename = (split /\//, __FILE__)[-1];
 our $dirname  = dirname(rel2abs(__FILE__));
 our $epinfo = $dirname . '/ep/epinfo';
+our $tooldir = $dirname . '/tool/';
 
 # Set Global Config {data_config}
 # set what information to collect
@@ -54,6 +55,22 @@ our %data_config = (
   'mount'		=> 1,
   'inet_name'		=> 1,
   'raid_info'		=> 1,
+
+  # call tool/*
+  'cpu_usage'		=> 1,
+  'fsio'		=> 1,
+  'dnsbl'		=> 1,
+  'iostat'		=> 1,
+  'tcpconn'		=> 1,
+  # call tool/* depend on epinfo
+  'emqueue'		=> 1,
+  'emgmqueue'		=> 1,
+  'mysqlping'		=> 1,
+  'mysqlrepl'		=> 1,
+  'imapcheck'		=> 1,
+  'popcheck'		=> 1,
+  'smtpcheck'		=> 1,
+  'httpcheck'		=> 1,
 );
 ## %data_config
 
