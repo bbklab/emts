@@ -32,6 +32,7 @@ our ($rc, $result) = (0,'');
 our $filename = (split /\//, __FILE__)[-1];
 our $dirname  = dirname(rel2abs(__FILE__));
 our $maillicense_decoder = $dirname . '/emlicense';
+our $emauto = $dirname . '/auto';
 
 # define EYOU_XXX
 use constant EYOUMAIL_INST  => '/usr/local/eyou/mail';
@@ -268,6 +269,43 @@ sub fill_mail_config {
 	}
 	
 	# 2. fill with other compent configs
+	my $fh;
+
+	# 2.1 fill http compent
+	open $fh, "$emauto httpaddr 2>&- |";
+	if ($fh) {
+		while (<$fh>) {
+			chomp; $result_configs{'c-http'}{'svraddr'} = $_;
+			last;
+		}
+	}
+
+	# 2.2 fill pop compent
+	open $fh, "$emauto popaddr 2>&- |";
+	if ($fh) {
+		while (<$fh>) {
+			chomp; $result_configs{'c-pop'}{'svraddr'} = $_;
+			last;
+		}
+	}
+
+	# 2.3 fill smtp compent
+	open $fh, "$emauto smtpaddr 2>&- |";
+	if ($fh) {
+		while (<$fh>) {
+			chomp; $result_configs{'c-smtp'}{'svraddr'} = $_;
+			last;
+		}
+	}
+
+	# 2.2 fill pop compent
+	open $fh, "$emauto imapaddr 2>&- |";
+	if ($fh) {
+		while (<$fh>) {
+			chomp; $result_configs{'c-imap'}{'svraddr'} = $_;
+			last;
+		}
+	}
 
 	return %result_configs
 }
