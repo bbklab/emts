@@ -18,8 +18,29 @@ $SIG{'PIPE'} = 'IGNORE';
 
 $| = 1;
 
+sub show_help {
+print <<EOF
+Arguments:    {pop_addr}
+Usage:   "127.0.0.1,110,zz\@eyou.net,zzpassword  pop.126.com,110,eyou,eyou"
+
+Output:   
+{pop_addr} succ
+{pop_addr} warn {warn-info}
+
+Example:
+127.0.0.1:110 warn IO::Socket::INET: connect: Connection refused
+pop.126.com:110 warn timeout
+EOF
+;
+exit(0);
+}
+
 unless (scalar @ARGV) {
   exit (0);
+}
+
+if ($ARGV[0] eq 'h') {
+  show_help;
 }
 
 our $addr_port = $ARGV[0];
@@ -58,42 +79,63 @@ while(@addr_pair) {
 	next;
   }
 
-  my $welcome = <$pop>;
-  if ($welcome && $welcome ne '') {
-	$welcome =~ s/[\r\n]//g;
+  # run all process in a eval{} with alarm(5)
+  eval {
+  	  local $SIG{'ALRM'} = sub { die 'Running Timed Out'; };
+  	  alarm(5);
+	  
+	  my $welcome = <$pop>;
+	  if ($welcome && $welcome ne '') {
+		$welcome =~ s/[\r\n]//g;
+	  }
+	  unless ($welcome && $welcome =~ m/\A\+OK/) {
+		if ($welcome && $welcome ne '') {
+			printf("%s warn %s\n", $address, $welcome);
+	  	} else {
+			printf("%s warn welcome banner empty\n", $address);
+	  	}
+		goto BREAK;
+	  }
+	
+	  if($pop_user && $pop_pass) {
+		print $pop "USER $pop_user\r\n";
+		my $response = <$pop>;
+		if ($response && $response ne '') {
+			$response =~ s/[\r\n]//g;
+		}
+		unless (defined $response && $response =~ m/\A\+OK/) {
+			$response = '' if (!defined $response);
+			printf("%s warn %s\n", $address, $response);
+			goto BREAK;
+		}
+	
+		print $pop "PASS $pop_pass\r\n";
+		$response = <$pop>;
+		if ($response && $response ne '') {
+			$response =~ s/[\r\n]//g;
+		}
+		unless (defined $response && $response =~ m/\A\+OK/) {
+			$response = '' if (!defined $response);
+			printf("%s warn %s\n", $address, $response);
+			goto BREAK;
+		} 
+	  }
+	  alarm(0);
+  };
+  alarm(0);
+
+  if ($@) {
+        $@ =~ s/[\r\n]//g;
+        if ($@ =~ m/Running Timed Out/) {
+                printf ("%s warn timeout\n", $address);
+        } else {
+                printf ("%s warn %s\n", $address, $@);
+        }   
+  } else {
+  	printf("%s succ\n", $address);
   }
-  unless ($welcome && $welcome =~ m/\A\+OK/) {
-	if ($welcome && $welcome ne '') {
-		printf("%s warn %s\n", $address, $welcome);
-  	} else {
-		printf("%s warn welcome banner empty\n", $address);
-  	}
+
+  BREAK: {
 	next;
-  }
-
-  if($pop_user && $pop_pass) {
-	print $pop "USER $pop_user\r\n";
-	my $response = <$pop>;
-	if ($response && $response ne '') {
-		$response =~ s/[\r\n]//g;
-	}
-	unless (defined $response && $response =~ m/\A\+OK/) {
-		$response = '' if (!defined $response);
-		printf("%s warn %s\n", $address, $response);
-		next;
-	}
-
-	print $pop "PASS $pop_pass\r\n";
-	$response = <$pop>;
-	if ($response && $response ne '') {
-		$response =~ s/[\r\n]//g;
-	}
-	unless (defined $response && $response =~ m/\A\+OK/) {
-		$response = '' if (!defined $response);
-		printf("%s warn %s\n", $address, $response)
-		next;
-	} 
-  }
-
-  printf("%s succ\n", $address);
+  };
 }

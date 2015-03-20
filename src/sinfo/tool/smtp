@@ -23,12 +23,12 @@ Arguments:    {smtp_addr}
 Usage:   "127.0.0.1,25,zz\@eyou.net,zzpassword  gateway.eyou.net,25,eyou,eyou"
 
 Output:   
-{url} succ
-{url} warn http_code
+{smtp_addr} succ
+{smtp_addr} warn http_code
 
 Example:
-http://127.0.0.1:80/index.php succ
-https://mail.eyou.net:443/a.html warn 400
+127.0.0.1:25 warn IO::Socket::INET: connect: Connection refused
+gateway.eyou.net:25 succ
 EOF
 ;
 exit (0);
