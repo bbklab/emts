@@ -23,18 +23,12 @@ check(){
 	return
   fi
 
-  local iostat="${UTIL_IOSTAT}"
-  if [ -f "${iostat}" ] && [ -x "${iostat}" ]; then
-	:
-  else
-	iostat="/usr/bin/iostat"
-  fi
+  iostat="/usr/bin/iostat"
   if [ -f "${iostat}" ] && [ -x "${iostat}" ]; then
 	:
   else
 	iostat="/usr/local/bin/iostat"
   fi
-  
   if [ ! -f "${iostat}" ] || [ ! -x "${iostat}" ]; then
 	return
   fi
