@@ -7,45 +7,16 @@ import (
 )
 
 type Config struct {
-	LogLevel int
-	PidFile  string
-	LogFile  string
-	IpAllow  []string
-	Tcpd     *Tcpd
-	Httpd    *Httpd
-	JobStore *JobStore
-}
-
-type Tcpd struct {
-	Enable bool
-	Listen []string
-}
-
-type Httpd struct {
-	Enable bool
-	Listen []string
-}
-
-type JobStore struct {
-	File   *JobStoreFile
-	Sqlite *JobStoreSqlite
-}
-
-type JobStoreFile struct {
-	Rqst string
-	Resp string
-}
-
-type JobStoreSqlite struct {
+	SysLoadUplimit int
 }
 
 func NewConfig(cfile string) (*Config, error) {
 	config := new(Config)
 	if content, err := ioutil.ReadFile(cfile); err != nil {
-		return nil, fmt.Errorf("Read Config File Error: %s", err.Error())
+		return nil, fmt.Errorf("E_Read_FAIL on CfgFile: %s", err.Error())
 	} else {
 		if err := json.Unmarshal(content, &config); err != nil {
-			return nil, fmt.Errorf("Json Unmarshal Error: %s", err.Error())
+			return nil, fmt.Errorf("E_UnMarshal_FAIL on CfgContent: %s", err.Error())
 		}
 	}
 	return config, nil
