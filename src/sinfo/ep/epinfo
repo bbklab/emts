@@ -123,7 +123,30 @@ sub read_ini {
 #
 
 # init each eyou product hash
-my (%mail, %gw, %epush, %mail4, %archive, %result);
+my (%common, %mail, %gw, %epush, %mail4, %archive, %result);
+
+# get common info
+my $exposed = undef;
+my $diskdev = undef;
+if (-f $emauto && -x $emauto) {
+	my $fh;
+	open $fh, "$emauto exposed 2>&- |";
+	if ($fh) {
+		while (<$fh>) {
+			chomp; $exposed = $_;
+			last;
+		}
+	}
+	open $fh, "$emauto diskdev 2>&- |";
+	if ($fh) {
+		while (<$fh>) {
+			chomp; $diskdev = $_;
+			last;
+		}
+	}
+}
+
+
 
 # get mail_serial
 my $mail_serial = undef;
@@ -298,7 +321,7 @@ sub fill_mail_config {
 		}
 	}
 
-	# 2.2 fill pop compent
+	# 2.4 fill pop compent
 	open $fh, "$emauto imapaddr 2>&- |";
 	if ($fh) {
 		while (<$fh>) {
@@ -306,6 +329,32 @@ sub fill_mail_config {
 			last;
 		}
 	}
+
+	# 2.5 fill emversion
+	open $fh, "$emauto emversion 2>&- |";
+	if ($fh) {
+		while (<$fh>) {
+			chomp; $result_configs{'emversion'} = $_;
+			last;
+		}
+	}
+
+	# 2.5 fill svrport
+	open $fh, "$emauto svrport 2>&- |";
+	if ($fh) {
+		while (<$fh>) {
+			chomp; $result_configs{'svrport'} = $_;
+			last;
+		}
+	}
+
+	# 2.5 fill process
+	#open $fh, "$emauto process 2>&- |";
+	#if ($fh) {
+		#while (<$fh>) {
+			#chomp; $result_configs{'process'} .= $_ . '\n';
+		#}
+	#}
 
 	return %result_configs
 }
@@ -444,6 +493,11 @@ if (-f $mail4_scriptd) {
 
 
 # PREPARE LAST RESULT HASH
+%common = (
+	'exposed'		=> $exposed,
+	'diskdev'		=> $diskdev,
+);
+
 %mail = (
 	'is_installed'		=> $ep_exists{'mail'},
         'license'		=> \%mail_license,
@@ -476,6 +530,7 @@ if (-f $mail4_scriptd) {
 );
 
 %result = (
+	'common'	=> \%common,
 	'mail'		=> \%mail,
 	'gw'		=> \%gw,
 	'epush'		=> \%epush,
