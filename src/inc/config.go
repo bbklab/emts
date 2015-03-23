@@ -8,6 +8,10 @@ import (
 
 type Config struct {
 	SysLoadUplimit int
+	SeqRetransRate float64
+	UdpLostRate    float64
+	ProcessSum     int
+	RecentRestart  int
 }
 
 func NewConfig(cfile string) (*Config, error) {

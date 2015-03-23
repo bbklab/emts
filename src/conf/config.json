@@ -1,3 +1,7 @@
 {
-  "SysLoadUplimit": 10
+  "SysLoadUplimit": 10,
+  "SeqRetransRate": 0.00,
+  "UdpLostRate":    0.00,
+  "ProcessSum":     10,
+  "RecentRestart":  0
 }
