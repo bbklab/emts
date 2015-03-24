@@ -2,9 +2,9 @@
 
 show_help(){
 cat <<EOF
-Arguments:   {mysqlcli_path}  {ip,port,user,pass  ip2,port2,user2,pass2  ...}
-Arguments:   {mysqlcli_path}  {unixsock1,user1,pass1  unixsock2,user2,pass2 ...}
-Usage:       /usr/local/eyou/mail/opt/mysql/bin/mysql "/usr/local/eyou/mail/run/em_mysql.sock,eyou,eyou 127.0.0.1,3316,eyou,eyou"
+Arguments:   {mysqlcli_path}  ip,port,user,pass  ip2,port2,user2,pass2  ...
+Arguments:   {mysqlcli_path}  unixsock1,user1,pass1  unixsock2,user2,pass2 ...
+Usage:       /usr/local/eyou/mail/opt/mysql/bin/mysql /usr/local/eyou/mail/run/em_mysql.sock,eyou,eyou 127.0.0.1,3316,eyou,eyou
 
 Output:
 {ip:port} succ
@@ -19,8 +19,8 @@ exit 0;
 MODE=0
 [ "$1" == "help" -o "$1" == "h" ] && show_help;
 
-mysqlcli_path="$1"
-mysql_conn_conf="$2"
+mysqlcli_path=$1; shift;
+mysql_conn_conf=$*
 mysql_time_out=5
 
 [ -z "${mysqlcli_path}" ] && exit 0 # mysqlcli_path="/usr/local/eyou/mail/opt/mysql/bin/mysql"
@@ -52,7 +52,7 @@ check() {
                 mysql_addr="${unixsocket}"
                 cmd="${mysqlcli_path} -S ${unixsocket} -u${mysql_user} --connect-timeout ${mysql_time_out} "
         else
-                return
+		continue
         fi
         if [ -n "${mysql_pass}" ]; then
                 cmd="${cmd} -p${mysql_pass} "

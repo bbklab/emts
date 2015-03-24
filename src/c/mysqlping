@@ -2,9 +2,9 @@
 
 show_help(){
 cat <<EOF
-Arguments:   {mysqladmin_path}  {ip,port,user,pass  ip,port,user,pass  ...}
-Arguments:   {mysqladmin_path}  {unixsock1,user,pass  unixsock2,user,pass  ...}
-Usage:       /usr/local/eyou/mail/opt/mysql/bin/mysqladmin "/usr/local/eyou/mail/run/em_mysql.sock,eyou,eyou 127.0.0.1,3316,eyou,eyou"
+Arguments:   {mysqladmin_path}  ip,port,user,pass  ip,port,user,pass  ...
+Arguments:   {mysqladmin_path}  unixsock1,user,pass  unixsock2,user,pass  ...
+Usage:       /usr/local/eyou/mail/opt/mysql/bin/mysqladmin /usr/local/eyou/mail/run/em_mysql.sock,eyou,eyou 127.0.0.1,3316,eyou,eyou
 
 Output:   
 {ip:port} succ
@@ -18,8 +18,8 @@ exit 0;
 MODE=0
 [ "$1" == "help" -o "$1" == "h" ] && show_help;
 
-mysqladmin_path="$1"
-mysql_conn_conf="$2"
+mysqladmin_path=$1; shift;
+mysql_conn_conf=$*
 mysql_time_out=10
 
 [ -z "${mysqladmin_path}" ] && exit 0 # mysqladmin_path="/usr/local/eyou/mail/opt/mysql/bin/mysqladmin"
@@ -51,7 +51,7 @@ check() {
 		mysql_addr="${unixsocket}"
         	cmd="${mysqladmin_path} -S ${unixsocket} -u${mysql_user} --connect-timeout ${mysql_time_out} "
   	else
-        	return
+		continue
   	fi
   	if [ -n "${mysql_pass}" ]; then
         	cmd="${cmd} -p${mysql_pass} "

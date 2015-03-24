@@ -21,7 +21,7 @@ $| = 1;
 sub show_help {
 print <<EOF
 Arguments:    {pop_addr}
-Usage:   "127.0.0.1,110,zz\@eyou.net,zzpassword  pop.126.com,110,eyou,eyou"
+Usage:   127.0.0.1,110,zz\@eyou.net,zzpassword  pop.126.com,110,eyou,eyou
 
 Output:   
 {pop_addr} succ
@@ -43,13 +43,11 @@ if ($ARGV[0] eq 'h') {
   show_help;
 }
 
-our $addr_port = $ARGV[0];
 our $time_out = 5;
 
-my @addr_pair = split /\s+/, $addr_port;
-while(@addr_pair) {
+while(@ARGV) {
 
-  my ($pop_host, $pop_port, $pop_user, $pop_pass) = (split /,/, shift @addr_pair)[0,1,2,3];
+  my ($pop_host, $pop_port, $pop_user, $pop_pass) = (split /,/, shift @ARGV)[0,1,2,3];
   if (!defined $pop_host || !defined $pop_port) {
 	next;
   }

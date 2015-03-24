@@ -23,7 +23,7 @@ $| = 1;
 sub show_help {
 print <<EOF
 Arguments:    {imap_addr}
-Usage:   "127.0.0.1,143,zz\@eyou.net,zzpassword  imap.126.com,143,eyou,eyou"
+Usage:   127.0.0.1,143,zz\@eyou.net,zzpassword  imap.126.com,143,eyou,eyou
 
 Output:   
 {imap_addr} succ
@@ -45,12 +45,11 @@ if ($ARGV[0] eq 'h') {
   show_help;
 }
 
-our $addr_port = $ARGV[0];
 our $time_out = 5;
 
-my @addr_pair = split /\s+/, $addr_port;
-while(@addr_pair) {
-  my ($imap_host, $imap_port, $imap_user, $imap_pass) = (split /,/, shift @addr_pair)[0,1,2,3];
+while(@ARGV) {
+
+  my ($imap_host, $imap_port, $imap_user, $imap_pass) = (split /,/, shift @ARGV)[0,1,2,3];
   if (!defined $imap_host || !defined $imap_port) {
 	next;
   }

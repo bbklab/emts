@@ -3,7 +3,7 @@
 show_help(){
 cat <<EOF
 Argument: {ipaddr-list}
-Example:  "118.194.236.35 1.1.1.1 8.8.8.8"
+Example:  118.194.236.35 1.1.1.1 8.8.8.8
 
 Output:
 {ipaddr} warn {dnsbl_server} {block_reason1} {block_reason2} ...
@@ -20,7 +20,7 @@ exit 0;
 
 dnsbl_server="zen.spamhaus.org"
 time_out=10
-exposed_addr=$1
+exposed_addr=$*
 
 # if null return STATE_UNKN.
 

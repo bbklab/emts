@@ -3,7 +3,7 @@
 show_help(){
 cat <<EOF
 Arguments:    {urls}
-Usage:   "http://127.0.0.1:80/index.php  https://mail.eyou.net:443/a.html"   
+Usage:   http://127.0.0.1:80/index.php  https://mail.eyou.net:443/a.html
 
 Output:   
 {url} succ
@@ -17,7 +17,7 @@ exit 0;
 }
 [ "$1" == "help" -o "$1" == "h" ] && show_help;
 
-urls="$1"
+urls=$*
 time_out=5
 
 check(){

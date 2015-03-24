@@ -20,7 +20,7 @@ $| = 1;
 sub show_help {
 print <<EOF
 Arguments:    {smtp_addr}
-Usage:   "127.0.0.1,25,zz\@eyou.net,zzpassword  gateway.eyou.net,25,eyou,eyou"
+Usage:   127.0.0.1,25,zz\@eyou.net,zzpassword  gateway.eyou.net,25,eyou,eyou
 
 Output:   
 {smtp_addr} succ
@@ -42,14 +42,12 @@ if ($ARGV[0] eq 'h') {
   show_help;
 }
 
-our $addr_port = $ARGV[0];
 our $time_out = 5;
 our $helo_me = 'localhost';
 
-my @addr_pair = split /\s+/, $addr_port;
-while(@addr_pair) {
+while(@ARGV) {
 
-  my ($smtp_host, $smtp_port, $smtp_user, $smtp_pass) = (split /,/, shift @addr_pair)[0,1,2,3];
+  my ($smtp_host, $smtp_port, $smtp_user, $smtp_pass) = (split /,/, shift @ARGV)[0,1,2,3];
   if (!defined $smtp_host || !defined $smtp_port) {
 	next;
   }
