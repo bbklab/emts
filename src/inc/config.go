@@ -12,6 +12,15 @@ type Config struct {
 	UdpLostRate    float64
 	ProcessSum     int
 	RecentRestart  int
+	IdleRate       float64
+	Load           float64
+	MemUsage       float64
+	DiskUsage      *DiskUsage
+}
+
+type DiskUsage struct {
+	Inode float64
+	Space float64
 }
 
 func NewConfig(cfile string) (*Config, error) {
