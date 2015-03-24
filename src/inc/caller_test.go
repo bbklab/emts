@@ -6,15 +6,28 @@ import (
 )
 
 func Test_Caller_1(t *testing.T) {
+	// single args
 	today := Caller("date", "+%F_%T")
 	if today != "" {
 		t.Log(today)
 	} else {
-		t.Error(today)
+		t.Error("Single_Args: calller return empty")
 		return
 	}
 
-	// test run by go
+	// multi args with space
+	temp := "/etc/passwd /etc/services"
+	ls := Caller("/bin/ls", temp)
+	if ls != "" {
+		t.Log(ls)
+	} else {
+		t.Error("Space_Args: caller return empty")
+		return
+	}
+}
+
+// test run by go
+func Test_Caller_2(t *testing.T) {
 	c := make(chan string)
 	tmout := make(chan bool, 1)
 	go func() {
@@ -23,7 +36,6 @@ func Test_Caller_1(t *testing.T) {
 	}()
 
 	go runCallerbyGo(c, "date", "+%F_%T")
-	//go runCallerbyGo(c, "sleep", "100")
 	select {
 	case output := <-c:
 		t.Log("goroutine return:", output)
@@ -35,13 +47,6 @@ func Test_Caller_1(t *testing.T) {
 		t.Error("timeout")
 		return
 	}
-
-	/*
-		name := "/home/zgz/emts/src/c/dnsbl"
-		args := "1.1.1.1 8.8.8.8 127.0.0.2"
-		r := Caller(name, args)
-		t.Log(r)
-	*/
 }
 
 func runCallerbyGo(c chan string, cmd, args string) {
@@ -49,7 +54,7 @@ func runCallerbyGo(c chan string, cmd, args string) {
 	c <- output
 }
 
-func Test_Caller_2(t *testing.T) {
+func Test_Caller_3(t *testing.T) {
 	for k, v := range Checker {
 		t.Log(k, v)
 	}
