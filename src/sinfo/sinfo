@@ -1546,22 +1546,12 @@ if ($data_config{'raid_info'}) {
 
 ##
 ##  part_3. eyou product info 
-##		this is optional, do it or not according by result of [epinfo have] instead of %data_config
 ##
 
 if (defined $epinfo && -f $epinfo && -x $epinfo) {
-  my $ephave = 0;
-  open my $fh, "$epinfo have 2>&- |";
-  if ($fh) {
-  	while (<$fh>) {
-		chomp; $ephave = $_;
-		last;
-  	}
-  }
-  if ($ephave) {
   	my %epinfo = ();
 	my ($_tmp_epinfo_json, $_tmp_epinfo_decode);
-	open $fh, "$epinfo 2>&- |";
+	open my $fh, "$epinfo 2>&- |";
 	if ($fh) {
 		while (<$fh>) {
 			chomp; $_tmp_epinfo_json = $_;
@@ -1576,8 +1566,7 @@ if (defined $epinfo && -f $epinfo && -x $epinfo) {
 			%epinfo = %{$_tmp_epinfo_decode};
 		}
 	}
-  	$result{'epinfo'} = \%epinfo;
-  }
+ 	$result{'epinfo'} = \%epinfo;
 }
 
 ### %result
