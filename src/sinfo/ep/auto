@@ -153,7 +153,9 @@ ARRAY_EMCOMP_SPECIAL=(
 # Show Help
 show_usage() {
 cat << EOF
-        ${0##*/}	emversion | exposed | svrport | smtpaddr | popaddr | imapaddr | httpaddr | process | diskdev | help
+        ${0##*/}	help | emversion | exposed | process | diskdev
+        ${0##*/}	smtpaddr | popaddr | imapaddr | httpaddr
+        ${0##*/}	mysqladdr | memcacheaddr | mproxyaddr | gearmanaddr 
 EOF
 exit 0
 }
@@ -377,23 +379,6 @@ get_emcomp_minr() {
 		
 	echo -en "${result}"
 }	
-
-# Get EM_COMP max_conn
-# 
-get_emcomp_maxc() {
-	local comp=$1	result=
-	local index=
-	
-	index=$(is_emcomp "${comp}" 2>&1)
-		
-	if [ "$?" == "0" ]; then
-		((index+=3))
-		result=${ARRAY_EMCOMP[$index]}
-	fi
-
-	echo -en "${result}"
-}
-
 
 # Print em_comp information
 # Usage:	get_emcompinfo	{comp}	{part}
@@ -656,27 +641,22 @@ get_process() {
 	fi
 }
 
-get_listen_port() {
-	local listen_port=
-	local sshd_file="/etc/ssh/sshd_config"
-	if [ -f "${sshd_file}" ] && [ -s "${sshd_file}" ]; then
-		local sshport="$(awk '($0~/^[ \t]*#/){next;} ($1~/^Port\>/){print $2;exit;}' "${sshd_file}" 2>&-)"
-		[ -z "${listen_port}" ] && listen_port="22"
-	fi
+get_listen_addr() {
+	local comps=$*
+	local listen_addr=
 
 	if [ "${IS_SUPPORTED_EMVERSION}" == "1" ]; then
-		local bind_addr=  port=  max_conn=
-		for comp in `list_emcomp`
+		local bind_addr=  port=
+		for comp in `echo "${comps}"`
 		do
 			if is_emstarton "${comp}" ; then
 				bind_addr="$(get_emcompinfo "${comp}" "bind_addr" 2>&-)"
 				for x in `echo "${bind_addr}"`
 				do
-					port=$(echo -e "${x}" | awk -F: '{print $NF}')
-					if [ -z "${listen_port}" ]; then
-						listen_port="${port}"
+					if [ -z "${listen_addr}" ]; then
+						listen_addr="${x}"
 					else
-						listen_port="${listen_port} ${port}"
+						listen_addr="${listen_addr} ${x}"
 					fi
 				done
 			fi
@@ -684,9 +664,9 @@ get_listen_port() {
 	fi
 
 	# remove duplication items.
-	listen_port=$(echo -e "${listen_port}" | awk -vRS="[\n ]" -vORS=" " '!a[$0]++' | sed -e 's/^[ \t]*//; s/[ \t]*$//;')
-	if [ ! -z "${listen_port}" ]; then
-		echo -e "${listen_port}"
+	listen_addr=$(echo -e "${listen_addr}" | awk -vRS="[\n ]" -vORS=" " '!a[$0]++' | sed -e 's/^[ \t]*//; s/[ \t]*$//;')
+	if [ ! -z "${listen_addr}" ]; then
+		echo -e "${listen_addr}"
 	fi
 }
 
@@ -858,6 +838,26 @@ get_exposed_addr() {
 	fi
 }
 
+get_mysql_svraddr() {
+	comps=( mysql mysql_index mysql_log )
+	get_listen_addr ${comps[*]}
+}
+
+get_mproxy_svraddr() {
+	comps=( mproxy mproxy_index mproxy_log )
+	get_listen_addr ${comps[*]}
+}
+
+get_memcache_svraddr() {
+	comps=( memcache_session memcache_fix  memcache_hot memcache_config memcache_db memcache_fastdb )
+	get_listen_addr ${comps[*]}
+}
+
+get_gearman_svraddr() {
+	comps=( gearman )
+	get_listen_addr ${comps[*]}
+}
+
 ####################################
 #                                  #
 #  --*--< Main Body Begin >--*--   #
@@ -882,6 +882,14 @@ case "${1}" in
 	echo ${EM_VERSION} 	;;
 "exposed")
 	get_exposed_addr	;;
+"mysqladdr")
+	get_mysql_svraddr	;;
+"mproxyaddr")
+	get_mproxy_svraddr	;;
+"memcacheaddr")
+	get_memcache_svraddr	;;
+"gearmanaddr")
+	get_gearman_svraddr	;;
 "smtpaddr")
 	get_smtp_svraddr	;;
 "imapaddr")
@@ -890,8 +898,6 @@ case "${1}" in
 	get_http_svraddr	;;
 "popaddr")
 	get_pop_svraddr		;;
-"svrport")
-	get_listen_port		;;
 "process")
 	get_process		;;
 "diskdev")
