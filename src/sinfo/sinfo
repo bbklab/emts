@@ -36,6 +36,8 @@ our %data_config = (
   'process'		=> 1,
   'netstat'		=> 1,
   'disk_space'		=> 1,
+  'cpu_usage'		=> 1,
+  'disk_fsio'		=> 1,
 
   # new added
   'process_top'		=> 1,
@@ -520,6 +522,82 @@ if ($data_config{'disk_space'}) {
   }
   ### @disk_space
   $result{'disk_space'} = \@disk_space;
+}
+
+# cpu_usage
+if ($data_config{'cpu_usage'}) {
+   my %cpu_usage = ();
+   my $vmstat = '/usr/bin/vmstat';
+   if (-f $vmstat && -x $vmstat) {
+	my $sampleNum = 5;
+	open my $fh, "$vmstat 1 $sampleNum 2>&- |";
+	if ($fh) {
+		while (<$fh>) {
+			chomp; s/\A\s*//; s/\s*\Z//;
+			next unless m/\A\s*\d+/;
+			my @tmp_arr = split /\s+/;
+			if (scalar @tmp_arr ne 17) {
+				next;
+			}
+			$cpu_usage{'id'} += $tmp_arr[14];
+			$cpu_usage{'wa'} += $tmp_arr[15];
+			$cpu_usage{'sy'} += $tmp_arr[13];
+			$cpu_usage{'us'} += $tmp_arr[12];
+		}
+	}
+	foreach my $i (keys %cpu_usage) {
+		$cpu_usage{$i} = sprintf("%0.2f",$cpu_usage{$i}/$sampleNum);
+	}
+   }
+   ### %cpu_usage
+   $result{'cpu_usage'} = \%cpu_usage;
+}
+
+# disk_fsio
+if ($data_config{'disk_fsio'}) {
+  my %disk_fsio = ();
+  my $mtabfile = '/etc/mtab';
+  my $tune2fs = '/sbin/tune2fs';
+  my $touch = '/bin/touch';
+  my %devlst = ();
+  if (-f $mtabfile && -r $mtabfile) {
+	if (open my $fh, "<", $mtabfile) {
+		while (<$fh>) {
+			chomp; s/(\A\s+|\s+\Z)//g;
+			my ($dev, $mount, $fstype) = (split /\s+/)[0,1,2];
+			if ($fstype =~ m/\b(ext2|ext3|ext4|gfs|gfs2)\b/i) {
+				$devlst{$dev} = $mount;
+			}
+		}
+		close $fh if $fh;
+	}
+  }
+  foreach my $dev (keys %devlst) {
+	open my $fh, "$tune2fs -l $dev 2>&- |";
+	if ($fh) {
+		while (<$fh>) {
+			chomp; s/(\A\s+|\s+\Z)//g;
+			if (m/Filesystem state/i) {
+				my $stat = (split /:/)[1];
+				$stat =~ s/(\A\s+|\s+\Z)//g;
+				$disk_fsio{'fsstat'}{$dev} = $stat;
+				last;
+			}
+		}
+	}
+
+	my $mount = $devlst{$dev};
+	my $fiotest = $mount . '/.iotest';
+	my $ioerror = `$touch $fiotest 2>&1`;
+	if ($? ne 0) {
+		$ioerror =~ s/[\r\n]//;
+		$disk_fsio{'iotest'}{$mount} = $ioerror;
+	} else {
+		$disk_fsio{'iotest'}{$mount} = 'succ';
+	}
+  }
+  ### %disk_fsio
+  $result{'disk_fsio'} = \%disk_fsio;
 }
 
 # process_top
