@@ -154,6 +154,9 @@ func process(sinfo *sjson.Json, config *inc.Config) {
 
 	mailSvrAddr := sinfo.Get("epinfo").Get("mail").Get("config").Get("svraddr").MustMap()
 	checkMailSvr(mailSvrAddr)
+
+	mailConfigs := sinfo.Get("epinfo").Get("mail").MustMap()
+	checkMailPhpd(mailConfigs)
 }
 
 func checkSysStartups(c chan string, ss []string) {
@@ -230,9 +233,9 @@ func checkSeqRetransRate(c chan string, ss map[string]interface{}, limit float64
 	case string:
 		if rate, err := strconv.ParseFloat((strings.TrimRight(value, "%")), 64); err == nil {
 			if rate >= limit {
-				c <- fmt.Sprintf("NOTE: Tcp Sequence Retransfer Rate %0.2f", rate)
+				c <- fmt.Sprintf("NOTE: Tcp Sequence Retransfer Rate %0.2f%s", rate, "%")
 			} else {
-				c <- fmt.Sprintf("SUCC: Tcp Sequence Retransfer Rate %0.2f", rate)
+				c <- fmt.Sprintf("SUCC: Tcp Sequence Retransfer Rate %0.2f%s", rate, "%")
 			}
 		} else {
 			c <- ""
@@ -248,9 +251,9 @@ func checkUdpLostRate(c chan string, ss map[string]interface{}, limit float64) {
 	case string:
 		if rate, err := strconv.ParseFloat((strings.TrimRight(value, "%")), 64); err == nil {
 			if rate >= limit {
-				c <- fmt.Sprintf("NOTE: Udp Packet Lost Rate %0.2f", rate)
+				c <- fmt.Sprintf("NOTE: Udp Packet Lost Rate %0.2f%s", rate, "%")
 			} else {
-				c <- fmt.Sprintf("SUCC: Udp Packet Lost Rate %0.2f", rate)
+				c <- fmt.Sprintf("SUCC: Udp Packet Lost Rate %0.2f%s", rate, "%")
 			}
 		} else {
 			c <- ""
@@ -397,9 +400,9 @@ func checkDiskUsage(c chan string, ss []interface{}, limit *inc.DiskUsage) {
 	}
 
 	if warn > 0 {
-		c <- "WARN: Disk Usage" + result
+		c <- "WARN: Disk Space/Inode Usage" + result
 	} else {
-		c <- "SUCC: Disk Usage"
+		c <- "SUCC: Disk Space/Inode Usage"
 	}
 
 Exit:
@@ -485,11 +488,157 @@ func checkMtaSvr(svr string, addrs string) {
 		result := inc.Caller(inc.Checker[svr], args)
 		warn, rest := parseCheckerOutput(result)
 		if warn > 0 {
-			fmt.Printf("WARN: %s Service\n%s\n", svr, rest)
+			fmt.Printf("WARN: %d %s Service Fail\n%s\n", warn, strings.ToUpper(svr), rest)
 		} else {
-			fmt.Printf("SUCC: %s Service\n", svr)
+			fmt.Printf("SUCC: %s Service\n", strings.ToUpper(svr))
 		}
 	}
+}
+
+func checkMailPhpd(mailcfg map[string]interface{}) {
+	mailStartups := mailcfg["startups"]
+	switch v := mailStartups.(type) {
+	case []interface{}:
+		startups := make([]string, 0)
+		for _, value := range v {
+			switch vv := value.(type) {
+			case string:
+				startups = append(startups, vv)
+			}
+		}
+		if strings.Contains(strings.Join(startups, " "), "phpd") {
+			mailcfg_tools := mailcfg["tools"]
+			mailcfg_config := mailcfg["config"]
+			var mailMysqlCLI, mailMysqlAdmin string
+			var mailUsrMysql, mailIdxMysql, mailLogMysql map[string]interface{}
+			switch tools := mailcfg_tools.(type) {
+			case map[string]interface{}:
+				switch v := tools["mysqlcli"].(type) {
+				case string:
+					mailMysqlCLI = v
+				}
+				switch v := tools["mysqladmin"].(type) {
+				case string:
+					mailMysqlAdmin = v
+				}
+			}
+			switch config := mailcfg_config.(type) {
+			case map[string]interface{}:
+				switch v := config["usrdb"].(type) {
+				case map[string]interface{}:
+					mailUsrMysql = v
+				}
+				switch v := config["idxdb"].(type) {
+				case map[string]interface{}:
+					mailIdxMysql = v
+				}
+				switch v := config["logdb"].(type) {
+				case map[string]interface{}:
+					mailLogMysql = v
+				}
+			}
+			// if mail startups contains phpd, check db connection
+			checkMailDBSvr(mailMysqlAdmin, mailUsrMysql, mailIdxMysql, mailLogMysql)
+			checkMailGMSvr(mailMysqlCLI, mailUsrMysql)
+		}
+	}
+}
+
+func checkMailDBSvr(mysqladmin string, userdb, idxdb, logdb map[string]interface{}) {
+	if mysqladmin != "" {
+		args := make([]string, 0)
+		args = append(args, mysqladmin)
+		dbcfg := map[string][]string{
+			"usr": []string{"db_mysql_host", "db_mysql_port", "db_mysql_user", "db_mysql_pass",
+				"mta_db_mysql_host", "mta_db_mysql_port", "mta_db_mysql_user", "mta_db_mysql_pass",
+			},
+			"idx": []string{"dbumi_mysql_dsn", "dbumi_mysql_user", "dbumi_mysql_pass",
+				"mta_dbumi_mysql_dsn", "mta_dbumi_mysql_user", "mta_dbumi_mysql_pass",
+			},
+			"log": []string{"dblog_mysql_host", "dblog_mysql_port", "dblog_mysql_user", "dblog_mysql_user"},
+		}
+		for name, conf := range dbcfg {
+			temp := ""
+			switch name {
+			case "usr":
+				for i, _ := range conf {
+					switch v := userdb[conf[i]].(type) {
+					case string:
+						if i%4 == 3 {
+							temp += v
+							args = append(args, temp)
+							temp = ""
+						} else {
+							temp += v + ","
+						}
+					}
+				}
+			case "log":
+				for i, _ := range conf {
+					switch v := logdb[conf[i]].(type) {
+					case string:
+						if i%4 == 3 {
+							temp += v
+							args = append(args, temp)
+							temp = ""
+						} else {
+							temp += v + ","
+						}
+					}
+				}
+			case "idx":
+				dsnhead := []string{}
+				user := ""
+				pass := ""
+				for i, _ := range conf {
+					switch v := idxdb[conf[i]].(type) {
+					case []interface{}: // parse dsn
+						for _, dsn := range v {
+							switch vdsn := dsn.(type) {
+							case string:
+								if strings.Contains(vdsn, "host=") {
+									arr := strings.Split(vdsn, ";")
+									if len(arr) >= 3 {
+
+										host := strings.Replace(arr[0], "host=", "", -1)
+										port := strings.Replace(arr[1], "port=", "", -1)
+										dsnhead = append(dsnhead, host+","+port)
+									}
+								} else if strings.Contains(vdsn, "unix_socket=") {
+									arr := strings.Split(vdsn, ";")
+									if len(arr) >= 2 {
+										unixsock := strings.Replace(arr[0], "unix_socket=", "", -1)
+										dsnhead = append(dsnhead, unixsock)
+									}
+								}
+							}
+						}
+					case string: // parse user/pass
+						if i%3 == 2 { // parse pass
+							pass = v
+							for _, head := range dsnhead {
+								args = append(args, head+","+user+","+pass)
+							}
+							dsnhead = []string{} // emtpy dsnhead []
+						} else if i%3 == 1 { // parse user
+							user = v
+						}
+					}
+				}
+			}
+		}
+		// Oh! finally finished! WTF!
+		result := inc.Caller(inc.Checker["mysqlping"], args)
+		warn, rest := parseCheckerOutput(result)
+		if warn > 0 {
+			fmt.Printf("CRIT: %d Mysql Service Fail\n%s\n", warn, rest)
+		} else {
+			fmt.Printf("SUCC: Mysql Service\n")
+		}
+	}
+}
+
+func checkMailGMSvr(mysqlcli string, userdb map[string]interface{}) {
 }
 
 func parseCheckerOutput(s string) (int, string) {

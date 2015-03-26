@@ -293,9 +293,17 @@ sub fill_mail_config {
 	
 	# 2. fill with other compent configs
 	my $fh;
+
+	open $fh, "$emauto emversion 2>&- |";
+	if ($fh) {
+		while (<$fh>) {
+			chomp; $result_configs{'emversion'} = $_;
+			last;
+		}
+	}
+
 	my %comp = ();
 
-	# 2.1 fill http compent
 	open $fh, "$emauto httpaddr 2>&- |";
 	if ($fh) {
 		while (<$fh>) {
@@ -304,7 +312,6 @@ sub fill_mail_config {
 		}
 	}
 
-	# 2.2 fill pop compent
 	open $fh, "$emauto popaddr 2>&- |";
 	if ($fh) {
 		while (<$fh>) {
@@ -313,7 +320,6 @@ sub fill_mail_config {
 		}
 	}
 
-	# 2.3 fill smtp compent
 	open $fh, "$emauto smtpaddr 2>&- |";
 	if ($fh) {
 		while (<$fh>) {
@@ -322,7 +328,6 @@ sub fill_mail_config {
 		}
 	}
 
-	# 2.4 fill pop compent
 	open $fh, "$emauto imapaddr 2>&- |";
 	if ($fh) {
 		while (<$fh>) {
@@ -360,34 +365,7 @@ sub fill_mail_config {
 		}
 	}
 
-	# 2.5 fill emversion
-	open $fh, "$emauto emversion 2>&- |";
-	if ($fh) {
-		while (<$fh>) {
-			chomp; $result_configs{'emversion'} = $_;
-			last;
-		}
-	}
-
-	# 2.5 fill svrport
-	open $fh, "$emauto svrport 2>&- |";
-	if ($fh) {
-		while (<$fh>) {
-			chomp; $result_configs{'svrport'} = $_;
-			last;
-		}
-	}
-
 	$result_configs{'svraddr'} = \%comp;
-
-	# 2.5 fill process
-	#open $fh, "$emauto process 2>&- |";
-	#if ($fh) {
-		#while (<$fh>) {
-			#chomp; $result_configs{'process'} .= $_ . '\n';
-		#}
-	#}
-
 	return %result_configs
 }
 
