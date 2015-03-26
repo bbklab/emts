@@ -2,6 +2,7 @@ package main
 
 import (
 	// "encoding/json"
+	"bufio"
 	"flag"
 	"fmt"
 	sjson "github.com/bitly/go-simplejson"
@@ -42,7 +43,7 @@ func main() {
 	}
 
 	output("Collecting ...")
-	sinfo := inc.Caller(inc.Sinfo, "")
+	sinfo := inc.Caller(inc.Sinfo, []string{})
 	if sinfo == "" {
 		output("E_Collect_FAIL on Sinfo")
 		os.Exit(1)
@@ -122,14 +123,21 @@ func process(sinfo *sjson.Json, config *inc.Config) {
 	i := 0
 	for {
 		s := <-c
-		if len(s) > 0 {
-			fmt.Printf("%-2d: %s\n", i, s)
-		}
 		i++
+		if len(s) > 0 {
+			fmt.Printf("%s\n", s)
+		}
 		if i >= n {
 			break
 		}
 	}
+
+	/* Following using inc.Caller to run other command
+	   If run by goroutine, will lead to nothing returned
+	*/
+	exposedAddr := sinfo.Get("epinfo").Get("common").Get("exposed").MustString()
+	checkDnsbl(exposedAddr, config.ExposedIP)
+
 }
 
 func checkSysStartups(c chan string, ss []string) {
@@ -346,20 +354,50 @@ func checkDiskUsage(c chan string, ss []interface{}, limit *inc.DiskUsage) {
 				warn++
 			}
 			tempstr += fmt.Sprintf(" InodeUsed %0.2f%s", inodeUsed, "%")
-			result += "\t" + mountValue + tempstr + "\n"
+			result += "\n\t" + mountValue + tempstr
 		default:
 			goto Exit
 		}
 	}
 
 	if warn > 0 {
-		c <- "WARN: Disk Usage\n" + result
+		c <- "WARN: Disk Usage" + result
 	} else {
-		c <- "SUCC: Disk Usage\n" + result
+		c <- "SUCC: Disk Usage" + result
 	}
 
 Exit:
 	c <- ""
+}
+
+func checkDnsbl(s string, cs []string) {
+	result := ""
+	warn := 0
+	if len(cs) > 0 { // if exposed address specified by config file
+		result = inc.Caller(inc.Checker["dnsbl"], cs)
+	} else if len(s) > 0 { // if auto detected exposed address
+		result = inc.Caller(inc.Checker["dnsbl"], []string{s})
+	}
+	r := strings.NewReader(result) // returned string.Reader implement io.Reader
+	buf := bufio.NewReader(r)      // use bufio to scan the result
+	for {
+		line, err := buf.ReadBytes('\n')
+		if err != nil { // include io.EOF
+			break
+		}
+		sline := strings.TrimRight(string(line), "\n")
+		if len(sline) > 0 {
+			arrline := strings.SplitN(sline, " ", 3)
+			if arrline[1] == "warn" {
+				warn++
+			}
+		} else {
+			break
+		}
+	}
+	if warn > 0 {
+		fmt.Printf("WARN: %d IPAddress Listed in DNSBL\n", warn)
+	}
 }
 
 func output(s string) {

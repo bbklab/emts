@@ -16,6 +16,7 @@ type Config struct {
 	Load           float64
 	MemUsage       float64
 	DiskUsage      *DiskUsage
+	ExposedIP      []string
 }
 
 type DiskUsage struct {
