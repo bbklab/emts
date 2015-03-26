@@ -6,12 +6,12 @@ Argument: {ipaddr-list}
 Example:  118.194.236.35 1.1.1.1 8.8.8.8
 
 Output:
-{ipaddr} warn {dnsbl_server} {block_reason1} {block_reason2} ...
-{ipaddr} succ {dnsbl_server}
+{ipaddr} warn {block_reason1} {block_reason2} ...
+{ipaddr} succ
 
 Example:
-118.194.236.35 warn zen.spamhaus.org "http://www.spamhaus.org/query/bl?ip=118.194.236.35" 
-8.8.8.8 succ zen.spamhaus.org
+118.194.236.35 warn "http://www.spamhaus.org/query/bl?ip=118.194.236.35" 
+8.8.8.8 succ
 EOF
 exit 0;
 }
@@ -61,7 +61,7 @@ check(){
 		else
 			if [ -n "${response}" ]; then
 				if (echo "${response}" | grep -E -q "^127.") >/dev/null 2>&1; then
-					echo -en "${x} warn ${y} \c"
+					echo -en "${x} warn \c"
 					reason=$( /usr/bin/dig +short +time="${time_out}" TXT "${queryname}" 2>/dev/null )
 					if [ -n "${reason}" ]; then
 						reason=$(echo -e "${reason}" |tr '\n' ' ')
@@ -69,7 +69,7 @@ check(){
 					fi
 					echo -en "\n"
 				else
-					echo -en "${x} succ ${y}\n"
+					echo -en "${x} succ\n"
 				fi
 			fi
 		fi
