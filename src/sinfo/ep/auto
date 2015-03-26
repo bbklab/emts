@@ -588,15 +588,13 @@ get_emcompinfo() {
 	
 	case "${part}" in
 	"bind_addr")
-		result="${bind_addr}"		;;
+		result="$(echo -e "${bind_addr}"| tr ':' ',')"	;;
 	"conn_addr")
 		result="${conn_addr}"		;;
 	"comp_regex")
 		result="${comp_regex}"	;;
 	"min_running")
 		result="${min_running}"		;;
-	*)
-		result="${bind_addr}\n${conn_addr}\n${comp_regex}\n${min_running}\n"	;;
 	esac
 
 	echo -en "${result}"
@@ -745,7 +743,7 @@ get_http_svraddr() {
 	fi
 
 	if [ ! -z "${cfg_value1}" ]; then
-		echo -e "${cfg_value1}"
+		echo -e "${cfg_value1}" | tr ',' ':'
 	fi
 }
 
