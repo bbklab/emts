@@ -690,7 +690,7 @@ get_pop_svraddr() {
 				bind_addr="$(get_emcompinfo "${comp}" "bind_addr" 2>&-)"
 				for x in `echo "${bind_addr}"`
 				do
-					port=$(echo -e "${x}" | awk -F: '{print $NF}')
+					port=$(echo -e "${x}" | awk -F, '{print $NF}')
 					if is_sub "${port}" "${tls_port}"; then
 						continue	# skip tls port
 					fi
@@ -726,7 +726,7 @@ get_http_svraddr() {
 				bind_addr="$(get_emcompinfo "${comp}" "bind_addr" 2>&-)"
 				for x in `echo "${bind_addr}"`
 				do
-					port=$(echo -e "${x}" | awk -F: '{print $NF}')
+					port=$(echo -e "${x}" | awk -F, '{print $NF}')
 					if [ "${port}" == "443" ]; then
 						protocal="https"
 					else
@@ -765,7 +765,7 @@ get_imap_svraddr() {
                 	for x in `echo "${bind_addr}"`
                 	do  
 				if is_emstarton "${comp}"; then
-					port=$(echo -e "${x}" | awk -F: '{print $NF}')
+					port=$(echo -e "${x}" | awk -F, '{print $NF}')
 					if is_sub "${port}" "${tls_port}"; then
 						continue        # skip tls port
 					fi
@@ -801,7 +801,7 @@ get_smtp_svraddr() {
 	                for x in `echo "${bind_addr}"`
 	                do  
 				if is_emstarton "${comp}"; then
-					port=$(echo -e "${x}" | awk -F: '{print $NF}')
+					port=$(echo -e "${x}" | awk -F, '{print $NF}')
 					if is_sub "${port}" "${tls_port}"; then
 						continue        # skip tls port
 					fi
