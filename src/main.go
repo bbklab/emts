@@ -7,6 +7,7 @@ import (
 	"fmt"
 	sjson "github.com/bitly/go-simplejson"
 	mo "github.com/gosexy/gettext"
+	"io"
 	"os"
 	"strconv"
 	"strings"
@@ -151,6 +152,8 @@ func process(sinfo *sjson.Json, config *inc.Config) {
 	exposedAddr := sinfo.Get("epinfo").Get("common").Get("exposed").MustString()
 	checkDnsbl(exposedAddr, config.ExposedIP)
 
+	mailSvrAddr := sinfo.Get("epinfo").Get("mail").Get("config").Get("svraddr").MustMap()
+	checkMailSvr(mailSvrAddr)
 }
 
 func checkSysStartups(c chan string, ss []string) {
@@ -455,32 +458,74 @@ Exit:
 
 func checkDnsbl(s string, cs []string) {
 	result := ""
-	warn := 0
 	if len(cs) > 0 { // if exposed address specified by config file
 		result = inc.Caller(inc.Checker["dnsbl"], cs)
 	} else if len(s) > 0 { // if auto detected exposed address
 		result = inc.Caller(inc.Checker["dnsbl"], []string{s})
 	}
-	r := strings.NewReader(result) // returned string.Reader implement io.Reader
-	buf := bufio.NewReader(r)      // use bufio to scan the result
+
+	warn, rest := parseCheckerOutput(result)
+	if warn > 0 {
+		fmt.Printf("WARN: %d IPAddress Listed in DNSBL\n%s\n", warn, rest)
+	}
+}
+
+func checkMailSvr(ss map[string]interface{}) {
+	for svr, addr := range ss {
+		switch addrs := addr.(type) {
+		case string:
+			checkMtaSvr(svr, addrs)
+		}
+	}
+}
+
+func checkMtaSvr(svr string, addrs string) {
+	args := strings.SplitN(addrs, " ", -1)
+	if svr == "smtp" || svr == "pop" || svr == "imap" || svr == "http" {
+		result := inc.Caller(inc.Checker[svr], args)
+		warn, rest := parseCheckerOutput(result)
+		if warn > 0 {
+			fmt.Printf("WARN: %s Service\n%s\n", svr, rest)
+		} else {
+			fmt.Printf("SUCC: %s Service\n", svr)
+		}
+	}
+}
+
+func parseCheckerOutput(s string) (int, string) {
+	warn := 0
+	result := ""
+	r := strings.NewReader(s) // returned string.Reader implement io.Reader
+	buf := bufio.NewReader(r) // use bufio to scan the result
 	for {
 		line, err := buf.ReadBytes('\n')
 		if err != nil { // include io.EOF
-			break
+			if err == io.EOF {
+				break
+			} else {
+				continue
+			}
 		}
 		sline := strings.TrimRight(string(line), "\n")
 		if len(sline) > 0 {
 			arrline := strings.SplitN(sline, " ", 3)
-			if arrline[1] == "warn" {
-				warn++
+			if len(arrline) >= 2 {
+				if arrline[1] == "warn" {
+					warn++
+					if len(arrline) >= 3 {
+						if len(result) > 0 {
+							result += "\n\t" + arrline[0] + " - " + arrline[2]
+						} else {
+							result += "\t" + arrline[0] + " - " + arrline[2]
+						}
+					}
+				}
 			}
 		} else {
-			break
+			continue
 		}
 	}
-	if warn > 0 {
-		fmt.Printf("WARN: %d IPAddress Listed in DNSBL\n", warn)
-	}
+	return warn, result
 }
 
 func output(s string) {
