@@ -10,17 +10,15 @@ packages=(
 
 for p in ${packages[*]} 
 do
-	echo -e "building package ${p} ... \c"
 	if go build ${p}; then
-		echo "Done"
+		:
 	else
-		echo "Fail"
+		echo -e "building package ${p} ... Fail"
 	fi
 done
 
-echo -e "main.go building ... \c"
 if go build main.go; then
-	echo "Done"
+	:
 else
-	echo "Fail"
+	echo -e "main.go building ... Fail"
 fi

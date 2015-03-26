@@ -24,3 +24,6 @@ msgstr "\n"
 
 msgid "require root privileges!"
 msgstr "需要ROOT权限运行!"
+
+msgid "Collecting ..."
+msgstr "正在搜集系统信息 ..."

@@ -591,7 +591,8 @@ if ($data_config{'disk_fsio'}) {
 	my $ioerror = `$touch $fiotest 2>&1`;
 	if ($? ne 0) {
 		$ioerror =~ s/[\r\n]//;
-		$disk_fsio{'iotest'}{$mount} = $ioerror;
+		my $error = (split(/:/, $ioerror))[-1];
+		$disk_fsio{'iotest'}{$mount} = $error;
 	} else {
 		$disk_fsio{'iotest'}{$mount} = 'succ';
 	}

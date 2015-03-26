@@ -18,7 +18,7 @@ func init() {
 	// gettext settings
 	mo.BindTextdomain(inc.AppName, inc.GetAppRealDirPath()+"/share/locale/")
 	mo.Textdomain(inc.AppName)
-	os.Setenv("LANGUAGE", "zh_CN.UTF8")
+	// os.Setenv("LANGUAGE", "en_US.UTF8") // this is not necessary
 	mo.SetLocale(mo.LC_ALL, "zh_CN.UTF8")
 }
 
@@ -84,8 +84,17 @@ func process(sinfo *sjson.Json, config *inc.Config) {
 	go checkSelinux(c, sysSelinux)
 	n++
 
-	sysHostName := sinfo.Get("os_info").MustMap()
+	sysHostName := sinfo.Get("os_info").Get("hostname").MustString()
 	go checkHostName(c, sysHostName)
+	n++
+
+	sysBitMode := sinfo.Get("os_info").Get("os_bitmode").MustString()
+	sysMemSize := sinfo.Get("mem_info").Get("memmaxcapacity").MustFloat64()
+	go checkMemorySize(c, sysBitMode, sysMemSize)
+	n++
+
+	sysSwapSize := sinfo.Get("mem_info").Get("os_swap_total").MustString()
+	go checkSwapSize(c, sysSwapSize)
 	n++
 
 	tcp_statistics := sinfo.Get("netstat").Get("tcp_statistics").MustMap()
@@ -118,6 +127,10 @@ func process(sinfo *sjson.Json, config *inc.Config) {
 
 	diskUsage := sinfo.Get("disk_space").MustArray()
 	go checkDiskUsage(c, diskUsage, config.DiskUsage)
+	n++
+
+	diskFsio := sinfo.Get("disk_fsio").MustMap()
+	go checkDiskFsio(c, diskFsio)
 	n++
 
 	i := 0
@@ -180,12 +193,32 @@ func checkSelinux(c chan string, ss map[string]interface{}) {
 	}
 }
 
-func checkHostName(c chan string, ss map[string]interface{}) {
-	if ss["hostname"] == "localhost" || ss["hostname"] == "localhost.localdomain" {
-		c <- fmt.Sprintf("NOTE: ReName the host a Better Name other than [%s]", ss["hostname"])
+func checkHostName(c chan string, hostname string) {
+	if hostname == "localhost" || hostname == "localhost.localdomain" {
+		c <- fmt.Sprintf("NOTE: ReName the host a Better Name other than [%s]", hostname)
 	} else {
-		c <- fmt.Sprintf("SUCC: Hostname %s", ss["hostname"])
+		c <- fmt.Sprintf("SUCC: Hostname %s", hostname)
 	}
+}
+
+func checkMemorySize(c chan string, bitmode string, memsize float64) {
+	memSize := int(memsize / 1024 / 1024)
+	if memSize >= 4 && bitmode == "32" {
+		c <- fmt.Sprintf("NOTE: %sbit OS with %dGB Memory", bitmode, memSize)
+	} else {
+		c <- fmt.Sprintf("SUCC: %sbit OS with %dGB Memory", bitmode, memSize)
+	}
+}
+
+func checkSwapSize(c chan string, swapsize string) {
+	if size, err := strconv.ParseFloat(swapsize, 64); err == nil {
+		if size <= 0 {
+			c <- fmt.Sprintf("WARN: Swap Size %0.2fGB", size/1024/1024)
+		} else {
+			c <- fmt.Sprintf("SUCC: Swap Size %0.2fGB", size/1024/1024)
+		}
+	}
+	c <- ""
 }
 
 func checkSeqRetransRate(c chan string, ss map[string]interface{}, limit float64) {
@@ -363,7 +396,57 @@ func checkDiskUsage(c chan string, ss []interface{}, limit *inc.DiskUsage) {
 	if warn > 0 {
 		c <- "WARN: Disk Usage" + result
 	} else {
-		c <- "SUCC: Disk Usage" + result
+		c <- "SUCC: Disk Usage"
+	}
+
+Exit:
+	c <- ""
+}
+
+func checkDiskFsio(c chan string, ss map[string]interface{}) {
+	result := ""
+	warn := 0
+
+	fsstat := ss["fsstat"]
+	iotest := ss["iotest"]
+	switch a := fsstat.(type) {
+	case map[string]interface{}:
+		for dev, stat := range a {
+			switch v := stat.(type) {
+			case string:
+				if v != "clean" {
+					warn++
+					result += "\n\t" + dev + " " + v
+				}
+			default:
+				goto Exit
+			}
+		}
+	default:
+		goto Exit
+	}
+
+	switch a := iotest.(type) {
+	case map[string]interface{}:
+		for mount, stat := range a {
+			switch v := stat.(type) {
+			case string:
+				if v != "succ" {
+					warn++
+					result += "\n\t" + mount + " " + v
+				}
+			default:
+				goto Exit
+			}
+		}
+	default:
+		goto Exit
+	}
+
+	if warn > 0 {
+		c <- "WARN: Disk Fsstat/IOTest" + result
+	} else {
+		c <- "SUCC: Disk Fsstat/IOTest"
 	}
 
 Exit:

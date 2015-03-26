@@ -1,15 +1,15 @@
 {
   "SysLoadUplimit": 10,
-  "SeqRetransRate": 0.00,
-  "UdpLostRate":    0.00,
-  "ProcessSum":     10,
+  "SeqRetransRate": 10.00,
+  "UdpLostRate":    10.00,
+  "ProcessSum":     1000,
   "RecentRestart":  1,
   "IdleRate":       95.00,
   "Load":           10.00,
   "MemUsage":       90.00,
   "DiskUsage":      {
-    "Inode":   15.00,
-    "Space":   15.00
+    "Inode":   95.00,
+    "Space":   95.00
   },
   "ExposedIP":      [
 	"118.194.236.35",
