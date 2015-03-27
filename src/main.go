@@ -169,15 +169,21 @@ func process(sinfo *sjson.Json, config *inc.Config) {
 		checkMailSvr(mailSvrAddr)
 
 		if mailStartups, err := sinfo.Get("epinfo").Get("mail").Get("startups").StringArray(); err == nil {
-			if strings.Contains(strings.Join(mailStartups, " "), "phpd") { // if mail startups contains phpd,
+			strMailStartups := strings.Join(mailStartups, " ")
+
+			if strings.Contains(strMailStartups, "phpd") { // if mail startups contains phpd,
 				mailConfigs := sinfo.Get("epinfo").Get("mail").MustMap()
 				checkMailPhpd(mailConfigs, config.GMQueueLimit)
 			}
 
-			if strings.Contains(strings.Join(mailStartups, " "), "remote") ||
-				strings.Contains(strings.Join(mailStartups, " "), "local") ||
-				strings.Contains(strings.Join(mailStartups, " "), "bounce") {
+			if strings.Contains(strMailStartups, "remote") || strings.Contains(strMailStartups, "local") {
 				checkMailQueue(config.QueueLimit)
+			}
+
+			if strings.Contains(strMailStartups, "mysql") ||
+				strings.Contains(strMailStartups, "mysql_index") ||
+				strings.Contains(strMailStartups, "mysql_log") {
+				checkMailMysqlRepl() // don't check if is slave, as caller return nothing if not slave
 			}
 		}
 	}
@@ -680,9 +686,9 @@ func checkMailDBSvr(mysqladmin string, userdb, idxdb, logdb map[string]interface
 	result := inc.Caller(inc.Checker["mysqlping"], args)
 	warn, rest := parseCheckerOutput(result)
 	if warn > 0 {
-		fmt.Printf("CRIT: %d Mysql Service Fail\n%s\n", warn, rest)
+		fmt.Printf("CRIT: %d Mysql Backend Connection Fail\n%s\n", warn, rest)
 	} else {
-		fmt.Printf("SUCC: Mysql Service\n")
+		fmt.Printf("SUCC: Mysql Backend Connection\n")
 	}
 }
 
@@ -710,16 +716,15 @@ func checkMailGMSvr(mysqlcli string, userdb map[string]interface{}, limit int64)
 	if len(arr) >= 2 {
 		if num, err := strconv.ParseInt(arr[0], 10, 64); err == nil {
 			if num >= limit {
-				fmt.Printf("WARN: Gearman Queue %d\n", num)
+				fmt.Printf("WARN: Gearman Backend Queue %d\n", num)
 				details := strings.SplitN(arr[1], ",", -1)
 				for _, v := range details {
 					if len(strings.TrimSpace(v)) > 0 {
 						fmt.Printf("\t%s\n", v)
 					}
 				}
-
 			} else {
-				fmt.Printf("SUCC: Gearman Queue %d\n", num)
+				fmt.Printf("SUCC: Gearman Backend Queue %d\n", num)
 			}
 		}
 	}
@@ -735,6 +740,24 @@ func checkMailQueue(limit int64) {
 			} else {
 				fmt.Printf("SUCC: Mail Queue %d\n", num)
 			}
+		}
+	}
+}
+
+func checkMailMysqlRepl() {
+	// use fix default settings here
+	args := []string{"/usr/local/eyou/mail/opt/mysql/bin/mysql",
+		"127.0.0.1,3306,eyou,eyou",
+		"127.0.0.1,3316,eyou,eyou",
+		"127.0.0.1,3326,eyou,eyou",
+	}
+	result := inc.Caller(inc.Checker["mysqlrepl"], args)
+	warn, rest := parseCheckerOutput(result)
+	if warn > 0 {
+		fmt.Printf("CRIT: %d Mysql Replication Fail\n%s\n", warn, rest)
+	} else {
+		if len(rest) > 0 { // if indeed have result
+			fmt.Printf("SUCC: Mysql Replication\n")
 		}
 	}
 }

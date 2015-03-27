@@ -87,11 +87,7 @@ check() {
 			else
 				result="${result} succ IO/SQL Thread Running"
 			fi
-		else
-			result="${result} warn slave status not detected, maybe slave not running"
 		fi
-	else
-		result="warn ${errstuff}"
 	fi
 
 	if [ -n "${result}" ]; then
