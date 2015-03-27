@@ -92,7 +92,7 @@ func process(sinfo *sjson.Json, config *inc.Config) {
 	n++
 
 	sysBitMode := sinfo.Get("os_info").Get("os_bitmode").MustString()
-	sysMemSize := sinfo.Get("mem_info").Get("memmaxcapacity").MustFloat64()
+	sysMemSize := sinfo.Get("mem_info").Get("os_mem_total").MustString()
 	go checkMemorySize(c, sysBitMode, sysMemSize)
 	n++
 
@@ -236,12 +236,16 @@ func checkHostName(c chan string, hostname string) {
 	}
 }
 
-func checkMemorySize(c chan string, bitmode string, memsize float64) {
-	memSize := int(memsize / 1024 / 1024)
-	if memSize >= 4 && bitmode == "32" {
-		c <- fmt.Sprintf("NOTE: %sbit OS with %dGB Memory", bitmode, memSize)
+func checkMemorySize(c chan string, bitmode string, memsize string) {
+	if msize, err := strconv.ParseInt(memsize, 10, 64); err == nil {
+		memSize := int64(msize / 1024 / 1024)
+		if memSize >= 4 && bitmode == "32" {
+			c <- fmt.Sprintf("NOTE: %sbit OS with %dGB Memory", bitmode, memSize)
+		} else {
+			c <- fmt.Sprintf("SUCC: %sbit OS with %dGB Memory", bitmode, memSize)
+		}
 	} else {
-		c <- fmt.Sprintf("SUCC: %sbit OS with %dGB Memory", bitmode, memSize)
+		c <- ""
 	}
 }
 
