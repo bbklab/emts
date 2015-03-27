@@ -74,7 +74,8 @@ func process(sinfo *sjson.Json, config *inc.Config) {
 	n := 0
 
 	if sysStartups, err := sinfo.Get("startups").StringArray(); err == nil {
-		go checkSysStartups(c, sysStartups)
+		must := []string{"network", "sshd"}
+		go checkSysStartups(c, sysStartups, must)
 		n++
 	}
 
@@ -158,6 +159,10 @@ func process(sinfo *sjson.Json, config *inc.Config) {
 		return
 	} else {
 
+		if sysStartups, err := sinfo.Get("startups").StringArray(); err == nil {
+			checkMailStartups(sysStartups, []string{"eyou_mail"})
+		}
+
 		checkSudoTTY()
 
 		mailSvrAddr := sinfo.Get("epinfo").Get("mail").Get("config").Get("svraddr").MustMap()
@@ -168,12 +173,17 @@ func process(sinfo *sjson.Json, config *inc.Config) {
 				mailConfigs := sinfo.Get("epinfo").Get("mail").MustMap()
 				checkMailPhpd(mailConfigs, config.GMQueueLimit)
 			}
+
+			if strings.Contains(strings.Join(mailStartups, " "), "remote") ||
+				strings.Contains(strings.Join(mailStartups, " "), "local") ||
+				strings.Contains(strings.Join(mailStartups, " "), "bounce") {
+				checkMailQueue(config.QueueLimit)
+			}
 		}
 	}
 }
 
-func checkSysStartups(c chan string, ss []string) {
-	must := []string{"eyou_mail", "sshd", "network"}
+func checkSysStartups(c chan string, ss []string, must []string) {
 	lost := make([]string, 0)
 	for _, v := range must {
 		isLost := true
@@ -486,6 +496,28 @@ func checkDnsbl(s string, cs []string) {
 	}
 }
 
+func checkMailStartups(ss []string, must []string) {
+	lost := make([]string, 0)
+	for _, v := range must {
+		isLost := true
+		for _, s := range ss {
+			if v == s {
+				isLost = false
+				break
+			}
+		}
+		if isLost {
+			lost = append(lost, v)
+		}
+	}
+	n := len(lost)
+	if n > 0 {
+		fmt.Printf("WARN: Lost %d eYou Product as System Startups: %v\n", n, lost)
+	} else {
+		fmt.Printf("SUCC: %d eYou Product as System Startups Ready\n", len(must))
+	}
+}
+
 func checkSudoTTY() {
 	if reg, err := regexp.Compile("^Defaults[ \t]*requiretty"); err == nil {
 		file := "/etc/sudoers"
@@ -688,6 +720,20 @@ func checkMailGMSvr(mysqlcli string, userdb map[string]interface{}, limit int64)
 
 			} else {
 				fmt.Printf("SUCC: Gearman Queue %d\n", num)
+			}
+		}
+	}
+}
+
+func checkMailQueue(limit int64) {
+	result := inc.Caller(inc.Checker["emqueue"], []string{})
+	arr := strings.SplitN(result, " ", -1)
+	if len(arr) >= 1 {
+		if num, err := strconv.ParseInt(arr[0], 10, 64); err == nil {
+			if num >= limit {
+				fmt.Printf("WARN: Mail Queue %d\n", num)
+			} else {
+				fmt.Printf("SUCC: Mail Queue %d\n", num)
 			}
 		}
 	}

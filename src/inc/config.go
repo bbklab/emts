@@ -18,6 +18,7 @@ type Config struct {
 	DiskUsage      *DiskUsage
 	ExposedIP      []string
 	GMQueueLimit   int64
+	QueueLimit     int64
 }
 
 type DiskUsage struct {

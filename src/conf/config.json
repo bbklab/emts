@@ -8,14 +8,11 @@
   "Load":           10.00,
   "MemUsage":       90.00,
   "DiskUsage":      {
-    "Inode":   95.00,
-    "Space":   95.00
+    "Inode":   90.00,
+    "Space":   90.00
   },
   "ExposedIP":      [
-	"118.194.236.35",
-	"1.1.1.1",
-	"8.8.8.8",
-	"127.0.0.2"
   ],
-  "GMQueueLimit":   1
+  "GMQueueLimit":   100,
+  "QueueLimit":     300
 }
