@@ -26,7 +26,7 @@ msgid "E_Require_Privilege"
 msgstr "需要ROOT权限!"
 
 msgid "E_UnMarshal_FAIL on CfgFile"
-msgstr "解析配置文件失败!"
+msgstr "加载配置文件失败!"
 
 msgid "E_Sys_OverLoad"
 msgstr "系统当前过载!"
@@ -39,3 +39,48 @@ msgstr "获取系统信息失败!"
 
 msgid "E_UnMarshal_FAIL on Sinfo"
 msgstr "解析系统信息失败!"
+
+msgid "SUCC: "
+msgstr "正常: "
+
+msgid "WARN: "
+msgstr "警告: "
+
+msgid "NOTE: "
+msgstr "注意: "
+
+msgid "CRIT: "
+msgstr "严重: "
+
+msgid "Lost %d System Startups: %v"
+msgstr "缺少 %d 个系统服务启动项: %v"
+
+msgid "%d System Startups Ready"
+msgstr "%d 个必须的系统服务启动项"
+
+msgid "%d System Super Privileged Users"
+msgstr "%d 个系统特权用户"
+
+msgid "System Super User"
+msgstr "系统特权用户"
+
+msgid "Selinux Enforcing"
+msgstr "Selinux 开启中"
+
+msgid "Selinux Closed"
+msgstr "Selinux 已关闭"
+
+msgid "ReName the host a Better Name other than [%s]"
+msgstr "主机名 [%s], 建议重命名"
+
+msgid "Hostname [%s]"
+msgstr "主机名 [%s]"
+
+msgid "%sbit OS with %dGB Memory and PAE Kernel"
+msgstr "%s位系统, %dGB内存, 已启用PAE内核"
+
+msgid "%sbit OS with %dGB Memory and without PAE Kernel"
+msgstr "%s位系统, %dGB内存, 但未启用PAE内核"
+
+msgid "%sbit OS with %dGB Memory"
+msgstr "%s位系统, %dGB内存"

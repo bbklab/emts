@@ -33,7 +33,7 @@ func NewConfig(cfile string) (*Config, error) {
 		return nil, fmt.Errorf("E_Read_FAIL on CfgFile: %s", err.Error())
 	} else {
 		if err := json.Unmarshal(content, &config); err != nil {
-			return nil, fmt.Errorf("E_UnMarshal_FAIL on CfgContent: %s", err.Error())
+			return nil, fmt.Errorf(err.Error())
 		}
 	}
 	return config, nil

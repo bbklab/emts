@@ -35,7 +35,7 @@ func main() {
 	flag.Parse()
 	config, err := inc.NewConfig(*cfgfile)
 	if err != nil {
-		output("E_UnMarshal_FAIL on CfgFile")
+		fmt.Println(trans("E_UnMarshal_FAIL on CfgFile"), err.Error())
 		os.Exit(1)
 	}
 
@@ -59,7 +59,7 @@ func main() {
 	*/
 	jsonsinfo, err := sjson.NewJson([]byte(sinfo))
 	if err != nil {
-		output("E_UnMarshal_FAIL on Sinfo")
+		fmt.Println(trans("E_UnMarshal_FAIL on Sinfo"), err.Error())
 		os.Exit(1)
 	}
 
@@ -93,7 +93,8 @@ func process(sinfo *sjson.Json, config *inc.Config) {
 
 	sysBitMode := sinfo.Get("os_info").Get("os_bitmode").MustString()
 	sysMemSize := sinfo.Get("mem_info").Get("os_mem_total").MustString()
-	go checkMemorySize(c, sysBitMode, sysMemSize)
+	sysKernelRls := sinfo.Get("os_info").Get("kernel_release").MustString()
+	go checkMemorySize(c, sysBitMode, sysMemSize, sysKernelRls)
 	n++
 
 	sysSwapSize := sinfo.Get("mem_info").Get("os_swap_total").MustString()
@@ -145,7 +146,7 @@ func process(sinfo *sjson.Json, config *inc.Config) {
 		s := <-c
 		i++
 		if len(s) > 0 {
-			fmt.Printf("%s\n", s)
+			fmt.Println(s)
 		}
 		if i >= n {
 			break
@@ -209,44 +210,48 @@ func checkSysStartups(c chan string, ss []string, must []string) {
 	}
 	n := len(lost)
 	if n > 0 {
-		c <- fmt.Sprintf("WARN: Lost %d System Startups: %v", n, lost)
+		c <- warn(fmt.Sprintf(trans("Lost %d System Startups: %v"), n, lost))
 	} else {
-		c <- fmt.Sprintf("SUCC: %d System Startups Ready", len(must))
+		c <- succ(fmt.Sprintf(trans("%d System Startups Ready"), len(must)))
 	}
 }
 
 func checkSuperUser(c chan string, ss []interface{}) {
 	n := len(ss)
 	if n > 1 {
-		c <- fmt.Sprintf("WARN: %d System Super Privileged Users", n)
+		c <- warn(fmt.Sprintf(trans("%d System Super Privileged Users"), n))
 	} else {
-		c <- fmt.Sprintf("SUCC: System Super User")
+		c <- succ(fmt.Sprintf(trans("System Super User")))
 	}
 }
 
 func checkSelinux(c chan string, ss map[string]interface{}) {
 	if ss["status"] == "enforcing" {
-		c <- fmt.Sprintf("CRIT: Selinux Enforcing")
+		c <- crit(fmt.Sprintf(trans("Selinux Enforcing")))
 	} else {
-		c <- fmt.Sprintf("SUCC: Selinux Closed")
+		c <- succ(fmt.Sprintf(trans("Selinux Closed")))
 	}
 }
 
 func checkHostName(c chan string, hostname string) {
 	if hostname == "localhost" || hostname == "localhost.localdomain" {
-		c <- fmt.Sprintf("NOTE: ReName the host a Better Name other than [%s]", hostname)
+		c <- note(fmt.Sprintf(trans("ReName the host a Better Name other than [%s]"), hostname))
 	} else {
-		c <- fmt.Sprintf("SUCC: Hostname %s", hostname)
+		c <- succ(fmt.Sprintf(trans("Hostname [%s]"), hostname))
 	}
 }
 
-func checkMemorySize(c chan string, bitmode string, memsize string) {
+func checkMemorySize(c chan string, bitmode, memsize, kernelrls string) {
 	if msize, err := strconv.ParseInt(memsize, 10, 64); err == nil {
 		memSize := int64(msize / 1024 / 1024)
 		if memSize >= 4 && bitmode == "32" {
-			c <- fmt.Sprintf("NOTE: %sbit OS with %dGB Memory", bitmode, memSize)
+			if strings.Contains(kernelrls, "PAE") {
+				c <- succ(fmt.Sprintf(trans("%sbit OS with %dGB Memory and PAE Kernel"), bitmode, memSize))
+			} else {
+				c <- note(fmt.Sprintf(trans("%sbit OS with %dGB Memory and without PAE Kernel"), bitmode, memSize))
+			}
 		} else {
-			c <- fmt.Sprintf("SUCC: %sbit OS with %dGB Memory", bitmode, memSize)
+			c <- succ(fmt.Sprintf(trans("%sbit OS with %dGB Memory"), bitmode, memSize))
 		}
 	} else {
 		c <- ""
@@ -829,9 +834,22 @@ func parseCheckerOutput(s string) (int, string) {
 }
 
 func output(s string) {
-	fmt.Println(trans(s))
+	fmt.Printf("%s\n", trans(s))
 }
 
 func trans(s string) string {
 	return mo.Gettext(s)
+}
+
+func succ(s string) string {
+	return trans("SUCC: ") + s
+}
+func note(s string) string {
+	return trans("NOTE: ") + s
+}
+func warn(s string) string {
+	return trans("WARN: ") + s
+}
+func crit(s string) string {
+	return trans("CRIT: ") + s
 }
