@@ -319,10 +319,10 @@ func checkRuntime(c chan string, s string, limit int) {
 
 func checkIdlerate(c chan string, s string, limit float64) {
 	if rate, err := strconv.ParseFloat(strings.TrimRight(s, "%"), 64); err == nil {
-		if rate >= limit {
-			c <- fmt.Sprintf("NOTE: System Idle Rate %0.2f", rate)
+		if rate <= limit {
+			c <- fmt.Sprintf("NOTE: System is Busy, Avg Idle Rate %0.2f%s", rate, "%")
 		} else {
-			c <- fmt.Sprintf("SUCC: System Idle Rate %0.2f", rate)
+			c <- fmt.Sprintf("SUCC: System is Idle, Avg Idle Rate %0.2f%s", rate, "%")
 		}
 	} else {
 		c <- ""
@@ -372,9 +372,9 @@ func checkMemUsage(c chan string, ss map[string]interface{}, limit float64) {
 
 	memusage = float64(memused * 100 / memtotal)
 	if memusage >= limit {
-		c <- fmt.Sprintf("WARN: Memory Usage %0.2f", memusage)
+		c <- fmt.Sprintf("WARN: Memory Usage %0.2f%s", memusage, "%")
 	} else {
-		c <- fmt.Sprintf("SUCC: Memory Usage %0.2f", memusage)
+		c <- fmt.Sprintf("SUCC: Memory Usage %0.2f%s", memusage, "%")
 	}
 
 Exit:
@@ -433,9 +433,9 @@ func checkDiskUsage(c chan string, ss []interface{}, limit *inc.DiskUsage) {
 	}
 
 	if warn > 0 {
-		c <- "WARN: Disk Space/Inode Usage" + result
+		c <- "WARN: Local Disk Space/Inode Usage" + result
 	} else {
-		c <- "SUCC: Disk Space/Inode Usage"
+		c <- "SUCC: Local Disk Space/Inode Usage"
 	}
 
 Exit:
@@ -483,9 +483,9 @@ func checkDiskFsio(c chan string, ss map[string]interface{}) {
 	}
 
 	if warn > 0 {
-		c <- "WARN: Disk Fsstat/IOTest" + result
+		c <- "WARN: Local Disk FSstat/IOTest" + result
 	} else {
-		c <- "SUCC: Disk Fsstat/IOTest"
+		c <- "SUCC: Local Disk FSstat/IOTest"
 	}
 
 Exit:

@@ -4,7 +4,7 @@
   "UdpLostRate":    10.00,
   "ProcessSum":     1000,
   "RecentRestart":  1,
-  "IdleRate":       95.00,
+  "IdleRate":       5.00,
   "Load":           10.00,
   "MemUsage":       90.00,
   "DiskUsage":      {
