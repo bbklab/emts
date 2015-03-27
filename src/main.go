@@ -35,7 +35,7 @@ func main() {
 	flag.Parse()
 	config, err := inc.NewConfig(*cfgfile)
 	if err != nil {
-		fmt.Println(err.Error())
+		output("E_UnMarshal_FAIL on CfgFile")
 		os.Exit(1)
 	}
 
@@ -59,7 +59,7 @@ func main() {
 	*/
 	jsonsinfo, err := sjson.NewJson([]byte(sinfo))
 	if err != nil {
-		output("E_UnMarshal_FAIL on Sinfo: " + err.Error())
+		output("E_UnMarshal_FAIL on Sinfo")
 		os.Exit(1)
 	}
 

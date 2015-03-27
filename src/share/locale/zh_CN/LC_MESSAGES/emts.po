@@ -22,8 +22,20 @@ msgstr "\t%+#D"
 msgid "\n"
 msgstr "\n"
 
-msgid "require root privileges!"
-msgstr "需要ROOT权限运行!"
+msgid "E_Require_Privilege"
+msgstr "需要ROOT权限!"
+
+msgid "E_UnMarshal_FAIL on CfgFile"
+msgstr "解析配置文件失败!"
+
+msgid "E_Sys_OverLoad"
+msgstr "系统当前过载!"
 
 msgid "Collecting ..."
 msgstr "正在搜集系统信息 ..."
+
+msgid "E_Collect_FAIL on Sinfo"
+msgstr "获取系统信息失败!"
+
+msgid "E_UnMarshal_FAIL on Sinfo"
+msgstr "解析系统信息失败!"
