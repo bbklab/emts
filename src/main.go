@@ -128,6 +128,10 @@ func process(sinfo *sjson.Json, config *inc.Config) {
 	go checkMemUsage(c, memUsage, config.MemUsage)
 	n++
 
+	cpuUsage := sinfo.Get("cpu_usage").MustMap()
+	go checkCpuUsage(c, cpuUsage, config.CpuUsage)
+	n++
+
 	diskUsage := sinfo.Get("disk_space").MustArray()
 	go checkDiskUsage(c, diskUsage, config.DiskUsage)
 	n++
@@ -375,6 +379,28 @@ func checkMemUsage(c chan string, ss map[string]interface{}, limit float64) {
 		c <- fmt.Sprintf("WARN: Memory Usage %0.2f%s", memusage, "%")
 	} else {
 		c <- fmt.Sprintf("SUCC: Memory Usage %0.2f%s", memusage, "%")
+	}
+
+Exit:
+	c <- ""
+}
+
+func checkCpuUsage(c chan string, ss map[string]interface{}, limit float64) {
+	idle := ss["id"]
+	switch value := idle.(type) {
+	case string:
+		if id, err := strconv.ParseFloat(value, 64); err == nil {
+			usage := float64(100 - id)
+			if usage >= limit {
+				c <- fmt.Sprintf("WARN: CPU Usage %0.2f%s", usage, "%")
+			} else {
+				c <- fmt.Sprintf("SUCC: CPU Usage %0.2f%s", usage, "%")
+			}
+		} else {
+			goto Exit
+		}
+	default:
+		goto Exit
 	}
 
 Exit:

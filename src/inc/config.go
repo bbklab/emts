@@ -15,6 +15,7 @@ type Config struct {
 	IdleRate       float64
 	Load           float64
 	MemUsage       float64
+	CpuUsage       float64
 	DiskUsage      *DiskUsage
 	ExposedIP      []string
 	GMQueueLimit   int64
