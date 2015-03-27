@@ -9,6 +9,7 @@ import (
 	mo "github.com/gosexy/gettext"
 	"io"
 	"os"
+	"regexp"
 	"strconv"
 	"strings"
 
@@ -152,11 +153,23 @@ func process(sinfo *sjson.Json, config *inc.Config) {
 	exposedAddr := sinfo.Get("epinfo").Get("common").Get("exposed").MustString()
 	checkDnsbl(exposedAddr, config.ExposedIP)
 
-	mailSvrAddr := sinfo.Get("epinfo").Get("mail").Get("config").Get("svraddr").MustMap()
-	checkMailSvr(mailSvrAddr)
+	mailIsInstalled := sinfo.Get("epinfo").Get("mail").Get("is_installed").MustInt()
+	if mailIsInstalled == 0 {
+		return
+	} else {
 
-	mailConfigs := sinfo.Get("epinfo").Get("mail").MustMap()
-	checkMailPhpd(mailConfigs)
+		checkSudoTTY()
+
+		mailSvrAddr := sinfo.Get("epinfo").Get("mail").Get("config").Get("svraddr").MustMap()
+		checkMailSvr(mailSvrAddr)
+
+		if mailStartups, err := sinfo.Get("epinfo").Get("mail").Get("startups").StringArray(); err == nil {
+			if strings.Contains(strings.Join(mailStartups, " "), "phpd") { // if mail startups contains phpd,
+				mailConfigs := sinfo.Get("epinfo").Get("mail").MustMap()
+				checkMailPhpd(mailConfigs, config.GMQueueLimit)
+			}
+		}
+	}
 }
 
 func checkSysStartups(c chan string, ss []string) {
@@ -473,6 +486,17 @@ func checkDnsbl(s string, cs []string) {
 	}
 }
 
+func checkSudoTTY() {
+	if reg, err := regexp.Compile("^Defaults[ \t]*requiretty"); err == nil {
+		file := "/etc/sudoers"
+		if inc.FGrepBool(file, reg) {
+			fmt.Printf("WARN: sudo Require TTY\n")
+		} else {
+			fmt.Printf("SUCC: sudo Ignore TTY\n")
+		}
+	}
+}
+
 func checkMailSvr(ss map[string]interface{}) {
 	for svr, addr := range ss {
 		switch addrs := addr.(type) {
@@ -495,111 +519,99 @@ func checkMtaSvr(svr string, addrs string) {
 	}
 }
 
-func checkMailPhpd(mailcfg map[string]interface{}) {
-	mailStartups := mailcfg["startups"]
-	switch v := mailStartups.(type) {
-	case []interface{}:
-		startups := make([]string, 0)
-		for _, value := range v {
-			switch vv := value.(type) {
-			case string:
-				startups = append(startups, vv)
-			}
+func checkMailPhpd(mailcfg map[string]interface{}, GMQueueLimit int64) {
+	mailcfg_tools := mailcfg["tools"]
+	mailcfg_config := mailcfg["config"]
+	var mailMysqlCLI, mailMysqlAdmin string
+	var mailUsrMysql, mailIdxMysql, mailLogMysql map[string]interface{}
+	switch tools := mailcfg_tools.(type) {
+	case map[string]interface{}:
+		switch v := tools["mysqlcli"].(type) {
+		case string:
+			mailMysqlCLI = v
 		}
-		if strings.Contains(strings.Join(startups, " "), "phpd") {
-			mailcfg_tools := mailcfg["tools"]
-			mailcfg_config := mailcfg["config"]
-			var mailMysqlCLI, mailMysqlAdmin string
-			var mailUsrMysql, mailIdxMysql, mailLogMysql map[string]interface{}
-			switch tools := mailcfg_tools.(type) {
-			case map[string]interface{}:
-				switch v := tools["mysqlcli"].(type) {
-				case string:
-					mailMysqlCLI = v
-				}
-				switch v := tools["mysqladmin"].(type) {
-				case string:
-					mailMysqlAdmin = v
-				}
-			}
-			switch config := mailcfg_config.(type) {
-			case map[string]interface{}:
-				switch v := config["usrdb"].(type) {
-				case map[string]interface{}:
-					mailUsrMysql = v
-				}
-				switch v := config["idxdb"].(type) {
-				case map[string]interface{}:
-					mailIdxMysql = v
-				}
-				switch v := config["logdb"].(type) {
-				case map[string]interface{}:
-					mailLogMysql = v
-				}
-			}
-			// if mail startups contains phpd, check db connection
-			checkMailDBSvr(mailMysqlAdmin, mailUsrMysql, mailIdxMysql, mailLogMysql)
-			checkMailGMSvr(mailMysqlCLI, mailUsrMysql)
+		switch v := tools["mysqladmin"].(type) {
+		case string:
+			mailMysqlAdmin = v
 		}
 	}
+	switch config := mailcfg_config.(type) {
+	case map[string]interface{}:
+		switch v := config["usrdb"].(type) {
+		case map[string]interface{}:
+			mailUsrMysql = v
+		}
+		switch v := config["idxdb"].(type) {
+		case map[string]interface{}:
+			mailIdxMysql = v
+		}
+		switch v := config["logdb"].(type) {
+		case map[string]interface{}:
+			mailLogMysql = v
+		}
+	}
+	checkMailDBSvr(mailMysqlAdmin, mailUsrMysql, mailIdxMysql, mailLogMysql)
+	checkMailGMSvr(mailMysqlCLI, mailUsrMysql, GMQueueLimit)
 }
 
 func checkMailDBSvr(mysqladmin string, userdb, idxdb, logdb map[string]interface{}) {
-	if mysqladmin != "" {
-		args := make([]string, 0)
-		args = append(args, mysqladmin)
-		dbcfg := map[string][]string{
-			"usr": []string{"db_mysql_host", "db_mysql_port", "db_mysql_user", "db_mysql_pass",
-				"mta_db_mysql_host", "mta_db_mysql_port", "mta_db_mysql_user", "mta_db_mysql_pass",
-			},
-			"idx": []string{"dbumi_mysql_dsn", "dbumi_mysql_user", "dbumi_mysql_pass",
-				"mta_dbumi_mysql_dsn", "mta_dbumi_mysql_user", "mta_dbumi_mysql_pass",
-			},
-			"log": []string{"dblog_mysql_host", "dblog_mysql_port", "dblog_mysql_user", "dblog_mysql_user"},
-		}
-		for name, conf := range dbcfg {
-			temp := ""
-			switch name {
-			case "usr":
-				for i, _ := range conf {
-					switch v := userdb[conf[i]].(type) {
-					case string:
-						if i%4 == 3 {
-							temp += v
-							args = append(args, temp)
-							temp = ""
-						} else {
-							temp += v + ","
-						}
+	if mysqladmin == "" {
+		return
+	}
+	args := make([]string, 0)
+	args = append(args, mysqladmin)
+	dbcfg := map[string][]string{
+		"usr": []string{"db_mysql_host", "db_mysql_port", "db_mysql_user", "db_mysql_pass",
+			"mta_db_mysql_host", "mta_db_mysql_port", "mta_db_mysql_user", "mta_db_mysql_pass",
+		},
+		"idx": []string{"dbumi_mysql_dsn", "dbumi_mysql_user", "dbumi_mysql_pass",
+			"mta_dbumi_mysql_dsn", "mta_dbumi_mysql_user", "mta_dbumi_mysql_pass",
+		},
+		"log": []string{"dblog_mysql_host", "dblog_mysql_port", "dblog_mysql_user", "dblog_mysql_user"},
+	}
+	for name, conf := range dbcfg {
+		temp := ""
+		switch name {
+		case "usr":
+			for i, _ := range conf {
+				switch v := userdb[conf[i]].(type) {
+				case string:
+					if i%4 == 3 {
+						temp += v
+						args = append(args, temp)
+						temp = ""
+					} else {
+						temp += v + ","
 					}
 				}
-			case "log":
-				for i, _ := range conf {
-					switch v := logdb[conf[i]].(type) {
-					case string:
-						if i%4 == 3 {
-							temp += v
-							args = append(args, temp)
-							temp = ""
-						} else {
-							temp += v + ","
-						}
+			}
+		case "log":
+			for i, _ := range conf {
+				switch v := logdb[conf[i]].(type) {
+				case string:
+					if i%4 == 3 {
+						temp += v
+						args = append(args, temp)
+						temp = ""
+					} else {
+						temp += v + ","
 					}
 				}
-			case "idx":
-				dsnhead := []string{}
-				user := ""
-				pass := ""
-				for i, _ := range conf {
+			}
+		case "idx":
+			dsnhead := []string{}
+			user := ""
+			pass := ""
+			for i, _ := range conf {
+				if i%3 == 0 { // parse dsn
 					switch v := idxdb[conf[i]].(type) {
-					case []interface{}: // parse dsn
+					case []interface{}:
 						for _, dsn := range v {
 							switch vdsn := dsn.(type) {
 							case string:
 								if strings.Contains(vdsn, "host=") {
 									arr := strings.Split(vdsn, ";")
 									if len(arr) >= 3 {
-
 										host := strings.Replace(arr[0], "host=", "", -1)
 										port := strings.Replace(arr[1], "port=", "", -1)
 										dsnhead = append(dsnhead, host+","+port)
@@ -613,32 +625,72 @@ func checkMailDBSvr(mysqladmin string, userdb, idxdb, logdb map[string]interface
 								}
 							}
 						}
-					case string: // parse user/pass
-						if i%3 == 2 { // parse pass
-							pass = v
-							for _, head := range dsnhead {
-								args = append(args, head+","+user+","+pass)
-							}
-							dsnhead = []string{} // emtpy dsnhead []
-						} else if i%3 == 1 { // parse user
-							user = v
+					}
+				} else if i%3 == 1 { // parse user
+					switch v := idxdb[conf[i]].(type) {
+					case string:
+						user = v
+					}
+				} else if i%3 == 2 { // parse pass
+					switch v := idxdb[conf[i]].(type) {
+					case string:
+						pass = v
+						for _, head := range dsnhead {
+							args = append(args, head+","+user+","+pass)
 						}
+						dsnhead = []string{} // emtpy dsnhead []
 					}
 				}
 			}
 		}
-		// Oh! finally finished! WTF!
-		result := inc.Caller(inc.Checker["mysqlping"], args)
-		warn, rest := parseCheckerOutput(result)
-		if warn > 0 {
-			fmt.Printf("CRIT: %d Mysql Service Fail\n%s\n", warn, rest)
-		} else {
-			fmt.Printf("SUCC: Mysql Service\n")
-		}
+	}
+	// Oh! finally finished! WTF!
+	result := inc.Caller(inc.Checker["mysqlping"], args)
+	warn, rest := parseCheckerOutput(result)
+	if warn > 0 {
+		fmt.Printf("CRIT: %d Mysql Service Fail\n%s\n", warn, rest)
+	} else {
+		fmt.Printf("SUCC: Mysql Service\n")
 	}
 }
 
-func checkMailGMSvr(mysqlcli string, userdb map[string]interface{}) {
+func checkMailGMSvr(mysqlcli string, userdb map[string]interface{}, limit int64) {
+	if mysqlcli == "" {
+		return
+	}
+	args := make([]string, 0)
+	args = append(args, mysqlcli)
+	dbcfg := []string{"db_mysql_host", "db_mysql_port", "db_mysql_user", "db_mysql_pass", "db_name"}
+	temp := ""
+	for _, v := range dbcfg {
+		switch vv := userdb[v].(type) {
+		case string:
+			if len(temp) > 0 {
+				temp += "," + vv
+			} else {
+				temp += vv
+			}
+		}
+	}
+	args = append(args, temp)
+	result := inc.Caller(inc.Checker["emgmqueue"], args)
+	arr := strings.SplitN(result, " ", 2)
+	if len(arr) >= 2 {
+		if num, err := strconv.ParseInt(arr[0], 10, 64); err == nil {
+			if num >= limit {
+				fmt.Printf("WARN: Gearman Queue %d\n", num)
+				details := strings.SplitN(arr[1], ",", -1)
+				for _, v := range details {
+					if len(strings.TrimSpace(v)) > 0 {
+						fmt.Printf("\t%s\n", v)
+					}
+				}
+
+			} else {
+				fmt.Printf("SUCC: Gearman Queue %d\n", num)
+			}
+		}
+	}
 }
 
 func parseCheckerOutput(s string) (int, string) {

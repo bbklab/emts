@@ -8,8 +8,7 @@ Usage:  /usr/local/eyou/mail/opt/mysql/bin/mysql "/usr/local/eyou/mail/run/em_my
 Usage:  /usr/local/eyou/mail/opt/mysql/bin/mysql "127.1,3306,eyou,eyou,eyou_mail" 
 
 Output:
-succ {total} {details}
-warn {sqlerror}
+{total} {details}
 Example:
 EOF
 exit 0;
@@ -53,7 +52,7 @@ check(){
   fi
 
   local gearman_queue_tmpfile="/var/tmp/.${0##*/}.queuegroup.num.tmp"
-  sqlerror=$( ${mysql} -s -e " SELECT COUNT(function_name),function_name FROM gearman_queue GROUP BY 2; " 2>&1 1>"${gearman_queue_tmpfile}" )
+  sqlerror=$( ${mysql} -s -e " SELECT COUNT(function_name),function_name FROM gearman_queue GROUP BY 2 LIMIT 10; " 2>&1 1>"${gearman_queue_tmpfile}" )
   rc=$?
   sqlerror=$( (echo -e "${sqlerror}" | sed -e '/password on the command line/d' |tr -d '\r\n') 2>&- )
   if [ $rc -eq 0 ]; then
@@ -62,9 +61,7 @@ check(){
 		total=$( cat "${gearman_queue_tmpfile}" | /bin/awk '{x+=$1} END{print x}' )
 		details=$( (cat "${gearman_queue_tmpfile}" | /bin/sort -rn | head -n 10 | /bin/awk '{printf "%s:%s,",$1,$2}' | tr -d '\n') 2>&- )
 	fi
-	echo "succ ${total} ${details}"
-  else
-	echo "warn ${sqlerror}"
+	echo "${total} ${details}"
   fi
 }
 
