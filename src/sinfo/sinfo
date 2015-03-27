@@ -1,17 +1,15 @@
 #!/usr/bin/env perl
 
-BEGIN {
-  my $inc = "./lib"; 
-  push @INC, @inc;
-};
-
 use warnings;
 use strict;
 use utf8;
-use JSON;
 use POSIX;
 use File::Spec::Functions qw(rel2abs);
 use File::Basename qw(dirname);
+
+use FindBin qw($Bin);
+use lib "$Bin/./lib";
+use JSON;
 
 # use Smart::Comments;
 binmode(STDIN, ":encoding(utf8)");

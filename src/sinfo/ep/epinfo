@@ -1,18 +1,17 @@
 #!/usr/bin/env perl
 
-BEGIN {
-  @incs = ();
-  push @INC, @incs;
-};
-
 use warnings;
 use strict;
 use utf8;
-use JSON;
 use POSIX;
 use File::Spec::Functions qw(rel2abs);
 use File::Basename qw(dirname);
 # use Smart::Comments;
+
+use FindBin qw($Bin);
+use lib "$Bin/../lib";
+use JSON;
+
 binmode(STDIN, ":encoding(utf8)");
 binmode(STDOUT, ":encoding(utf8)");
 binmode(STDERR, ":encoding(utf8)");
