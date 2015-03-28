@@ -53,10 +53,10 @@ msgid "CRIT: "
 msgstr "严重: "
 
 msgid "Lost %d System Startups: %v"
-msgstr "缺少 %d 个系统服务启动项: %v"
+msgstr "缺失 %d 个系统服务启动项: %v"
 
 msgid "%d System Startups Ready"
-msgstr "%d 个必须的系统服务启动项"
+msgstr "%d 个必须的系统服务启动项就绪"
 
 msgid "%d System Super Privileged Users"
 msgstr "%d 个系统特权用户"
@@ -84,3 +84,90 @@ msgstr "%s位系统, %dGB内存, 但未启用PAE内核"
 
 msgid "%sbit OS with %dGB Memory"
 msgstr "%s位系统, %dGB内存"
+
+msgid "Swap Size %0.2fGB"
+msgstr "交换空间大小 %0.2fGB"
+
+msgid "Tcp Sequence Retransfer Rate %0.2f%s"
+msgstr "TCP重传率 %0.2f%s"
+
+msgid "Udp Packet Lost Rate %0.2f%s"
+msgstr "UDP丢包率 %0.2f%s"
+
+msgid "Running Process Sum %d"
+msgstr "系统进程数 %d"
+
+msgid "OS Restart Recently ?"
+msgstr "系统最近重启过 ?"
+
+msgid "OS has been Running for %d days"
+msgstr "系统已运行 %d 天"
+
+msgid "System is Busy, Avg Idle Rate %0.2f%s"
+msgstr "系统较繁忙, 平均空闲率 %0.2f%s"
+
+msgid "System is Idle, Avg Idle Rate %0.2f%s"
+msgstr "系统较空闲, 平均空闲率 %0.2f%s"
+
+msgid "System Load Avg %0.2f"
+msgstr "系统负载 %0.2f"
+
+msgid "Memory Usage %0.2f%s"
+msgstr "内存使用率 %0.2f%s"
+
+msgid "CPU Usage %0.2f%s"
+msgstr "CPU使用率 %0.2f%s"
+
+msgid " SpaceUsed %0.2f%s,"
+msgstr " 磁盘空间使用 %0.2f%s,"
+
+msgid " InodeUsed %0.2f%s"
+msgstr " 磁盘节点使用 %0.2f%s"
+
+msgid "Local Disk Space/Inode Usage"
+msgstr "本地磁盘空间/节点使用率"
+
+msgid "Local Disk FSstat/IOTest"
+msgstr "本地磁盘文件系统/IO测试"
+
+msgid "%d Exposed IPAddress Listed in DNSBL\n%s\n"
+msgstr "%d 个出口IP被列入黑名单中\n%s\n"
+
+msgid "%d Exposed IPAddress NOT Listed in DNSBL\n"
+msgstr "%d 个出口IP不在黑名单中\n"
+
+msgid "Lost %d eYou Product as System Startups: %v\n"
+msgstr "缺失 %d 个亿邮产品的系统启动项: %v\n"
+
+msgid "%d eYou Product as System Startups Ready\n"
+msgstr "%d 个亿邮产品的系统启动项就绪\n"
+
+msgid "sudo Require TTY\n"
+msgstr "sudo requiretty 选项未关闭\n"
+
+msgid "sudo Ignore TTY\n"
+msgstr "sudo requiretty 已关闭\n"
+
+msgid "%d %s Mail Service Fail\n%s\n"
+msgstr "%d 个 %s 邮件服务组件异常\n%s\n"
+
+msgid "%s Mail Service\n"
+msgstr "%s 邮件服务组件正常\n"
+
+msgid "%d Mysql Backend Connection Fail\n%s\n"
+msgstr "%d 个Mysql后端服务连接失败\n%s\n"
+
+msgid "%d Mysql Backend Connection\n"
+msgstr "%d 个Mysql后端服务连接正常\n"
+
+msgid "Gearman Backend Queue %d\n"
+msgstr "Gearman队列总数 %d\n"
+
+msgid "Mail Queue %d\n"
+msgstr "邮件投递队列总数 %d\n"
+
+msgid "%d Mysql Replication Fail\n%s\n"
+msgstr "%d 个Mysql复制异常\n%s\n"
+
+msgid "%d Mysql Replication\n"
+msgstr "%d 个Mysql复制正常\n"

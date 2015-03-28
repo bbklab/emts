@@ -16,6 +16,13 @@ import (
 	"inc"
 )
 
+var LevelMap map[string]int = map[string]int{
+	"Succ": 0,
+	"Note": 0,
+	"Warn": 0,
+	"Crit": 0,
+}
+
 func init() {
 	// gettext settings
 	mo.BindTextdomain(inc.AppName, inc.GetAppRealDirPath()+"/share/locale/")
@@ -65,6 +72,8 @@ func main() {
 
 	// Processing Result
 	process(jsonsinfo, config)
+
+	fmt.Println(LevelMap)
 
 	os.Exit(0)
 }
@@ -162,35 +171,43 @@ func process(sinfo *sjson.Json, config *inc.Config) {
 	mailIsInstalled := sinfo.Get("epinfo").Get("mail").Get("is_installed").MustInt()
 	if mailIsInstalled == 0 {
 		return
-	} else {
+	}
 
-		if sysStartups, err := sinfo.Get("startups").StringArray(); err == nil {
-			checkMailStartups(sysStartups, []string{"eyou_mail"})
-		}
+	/*
+		begin eyou mail related check
+	*/
+	if sysStartups, err := sinfo.Get("startups").StringArray(); err == nil {
+		go checkMailStartups(sysStartups, []string{"eyou_mail"})
+	}
 
-		checkSudoTTY()
+	go checkSudoTTY()
 
-		mailSvrAddr := sinfo.Get("epinfo").Get("mail").Get("config").Get("svraddr").MustMap()
-		checkMailSvr(mailSvrAddr)
+	mailSvrAddr := sinfo.Get("epinfo").Get("mail").Get("config").Get("svraddr").MustMap()
+	go checkMailSvr(mailSvrAddr)
 
-		if mailStartups, err := sinfo.Get("epinfo").Get("mail").Get("startups").StringArray(); err == nil {
-			strMailStartups := strings.Join(mailStartups, " ")
+	// get eyou mail startups
+	arrMailStartups, err := sinfo.Get("epinfo").Get("mail").Get("startups").StringArray()
+	if err != nil {
+		return
+	}
+	strMailStartups := strings.Join(arrMailStartups, " ")
 
-			if strings.Contains(strMailStartups, "phpd") { // if mail startups contains phpd,
-				mailConfigs := sinfo.Get("epinfo").Get("mail").MustMap()
-				checkMailPhpd(mailConfigs, config.GMQueueLimit)
-			}
+	// if mail startups contains phpd
+	if strings.Contains(strMailStartups, "phpd") {
+		mailConfigs := sinfo.Get("epinfo").Get("mail").MustMap()
+		go checkMailPhpd(mailConfigs, config.GMQueueLimit)
+	}
 
-			if strings.Contains(strMailStartups, "remote") || strings.Contains(strMailStartups, "local") {
-				checkMailQueue(config.QueueLimit)
-			}
+	// if mail startups contains remote or local
+	if strings.Contains(strMailStartups, "remote") || strings.Contains(strMailStartups, "local") {
+		go checkMailQueue(config.QueueLimit)
+	}
 
-			if strings.Contains(strMailStartups, "mysql") ||
-				strings.Contains(strMailStartups, "mysql_index") ||
-				strings.Contains(strMailStartups, "mysql_log") {
-				checkMailMysqlRepl() // don't check if is slave, as caller return nothing if not slave
-			}
-		}
+	// if mail startups contains mysql backedn
+	if strings.Contains(strMailStartups, "mysql") ||
+		strings.Contains(strMailStartups, "mysql_index") ||
+		strings.Contains(strMailStartups, "mysql_log") {
+		go checkMailMysqlRepl() // don't check if is slave, as caller return nothing if not slave
 	}
 }
 
@@ -210,34 +227,34 @@ func checkSysStartups(c chan string, ss []string, must []string) {
 	}
 	n := len(lost)
 	if n > 0 {
-		c <- warn(fmt.Sprintf(trans("Lost %d System Startups: %v"), n, lost))
+		c <- _warn(fmt.Sprintf(trans("Lost %d System Startups: %v"), n, lost))
 	} else {
-		c <- succ(fmt.Sprintf(trans("%d System Startups Ready"), len(must)))
+		c <- _succ(fmt.Sprintf(trans("%d System Startups Ready"), len(must)))
 	}
 }
 
 func checkSuperUser(c chan string, ss []interface{}) {
 	n := len(ss)
 	if n > 1 {
-		c <- warn(fmt.Sprintf(trans("%d System Super Privileged Users"), n))
+		c <- _warn(fmt.Sprintf(trans("%d System Super Privileged Users"), n))
 	} else {
-		c <- succ(fmt.Sprintf(trans("System Super User")))
+		c <- _succ(fmt.Sprintf(trans("System Super User")))
 	}
 }
 
 func checkSelinux(c chan string, ss map[string]interface{}) {
 	if ss["status"] == "enforcing" {
-		c <- crit(fmt.Sprintf(trans("Selinux Enforcing")))
+		c <- _crit(fmt.Sprintf(trans("Selinux Enforcing")))
 	} else {
-		c <- succ(fmt.Sprintf(trans("Selinux Closed")))
+		c <- _succ(fmt.Sprintf(trans("Selinux Closed")))
 	}
 }
 
 func checkHostName(c chan string, hostname string) {
 	if hostname == "localhost" || hostname == "localhost.localdomain" {
-		c <- note(fmt.Sprintf(trans("ReName the host a Better Name other than [%s]"), hostname))
+		c <- _note(fmt.Sprintf(trans("ReName the host a Better Name other than [%s]"), hostname))
 	} else {
-		c <- succ(fmt.Sprintf(trans("Hostname [%s]"), hostname))
+		c <- _succ(fmt.Sprintf(trans("Hostname [%s]"), hostname))
 	}
 }
 
@@ -246,12 +263,12 @@ func checkMemorySize(c chan string, bitmode, memsize, kernelrls string) {
 		memSize := int64(msize / 1024 / 1024)
 		if memSize >= 4 && bitmode == "32" {
 			if strings.Contains(kernelrls, "PAE") {
-				c <- succ(fmt.Sprintf(trans("%sbit OS with %dGB Memory and PAE Kernel"), bitmode, memSize))
+				c <- _succ(fmt.Sprintf(trans("%sbit OS with %dGB Memory and PAE Kernel"), bitmode, memSize))
 			} else {
-				c <- note(fmt.Sprintf(trans("%sbit OS with %dGB Memory and without PAE Kernel"), bitmode, memSize))
+				c <- _note(fmt.Sprintf(trans("%sbit OS with %dGB Memory and without PAE Kernel"), bitmode, memSize))
 			}
 		} else {
-			c <- succ(fmt.Sprintf(trans("%sbit OS with %dGB Memory"), bitmode, memSize))
+			c <- _succ(fmt.Sprintf(trans("%sbit OS with %dGB Memory"), bitmode, memSize))
 		}
 	} else {
 		c <- ""
@@ -261,9 +278,9 @@ func checkMemorySize(c chan string, bitmode, memsize, kernelrls string) {
 func checkSwapSize(c chan string, swapsize string) {
 	if size, err := strconv.ParseFloat(swapsize, 64); err == nil {
 		if size <= 0 {
-			c <- fmt.Sprintf("WARN: Swap Size %0.2fGB", size/1024/1024)
+			c <- _warn(fmt.Sprintf(trans("Swap Size %0.2fGB"), size/1024/1024))
 		} else {
-			c <- fmt.Sprintf("SUCC: Swap Size %0.2fGB", size/1024/1024)
+			c <- _succ(fmt.Sprintf(trans("Swap Size %0.2fGB"), size/1024/1024))
 		}
 	}
 	c <- ""
@@ -275,9 +292,9 @@ func checkSeqRetransRate(c chan string, ss map[string]interface{}, limit float64
 	case string:
 		if rate, err := strconv.ParseFloat((strings.TrimRight(value, "%")), 64); err == nil {
 			if rate >= limit {
-				c <- fmt.Sprintf("NOTE: Tcp Sequence Retransfer Rate %0.2f%s", rate, "%")
+				c <- _note(fmt.Sprintf(trans("Tcp Sequence Retransfer Rate %0.2f%s"), rate, "%"))
 			} else {
-				c <- fmt.Sprintf("SUCC: Tcp Sequence Retransfer Rate %0.2f%s", rate, "%")
+				c <- _succ(fmt.Sprintf(trans("Tcp Sequence Retransfer Rate %0.2f%s"), rate, "%"))
 			}
 		} else {
 			c <- ""
@@ -293,9 +310,9 @@ func checkUdpLostRate(c chan string, ss map[string]interface{}, limit float64) {
 	case string:
 		if rate, err := strconv.ParseFloat((strings.TrimRight(value, "%")), 64); err == nil {
 			if rate >= limit {
-				c <- fmt.Sprintf("NOTE: Udp Packet Lost Rate %0.2f%s", rate, "%")
+				c <- _note(fmt.Sprintf(trans("Udp Packet Lost Rate %0.2f%s"), rate, "%"))
 			} else {
-				c <- fmt.Sprintf("SUCC: Udp Packet Lost Rate %0.2f%s", rate, "%")
+				c <- _succ(fmt.Sprintf(trans("Udp Packet Lost Rate %0.2f%s"), rate, "%"))
 			}
 		} else {
 			c <- ""
@@ -307,9 +324,9 @@ func checkUdpLostRate(c chan string, ss map[string]interface{}, limit float64) {
 
 func checkProcessNum(c chan string, s int, limit int) {
 	if s >= limit {
-		c <- fmt.Sprintf("WARN: Running Process Sum %d ", s)
+		c <- _warn(fmt.Sprintf(trans("Running Process Sum %d"), s))
 	} else {
-		c <- fmt.Sprintf("SUCC: Runing Process Sum %d", s)
+		c <- _succ(fmt.Sprintf(trans("Running Process Sum %d"), s))
 	}
 }
 
@@ -317,9 +334,9 @@ func checkRuntime(c chan string, s string, limit int) {
 	if rtime, err := strconv.ParseFloat(s, 64); err == nil {
 		d := int(rtime / float64(3600*24))
 		if d <= limit {
-			c <- fmt.Sprintf("NOTE: OS Restart Recently ?")
+			c <- _note(fmt.Sprintf(trans("OS Restart Recently ?")))
 		} else {
-			c <- fmt.Sprintf("SUCC: OS has been Running for %d days", d)
+			c <- _succ(fmt.Sprintf(trans("OS has been Running for %d days"), d))
 		}
 	} else {
 		c <- ""
@@ -329,9 +346,9 @@ func checkRuntime(c chan string, s string, limit int) {
 func checkIdlerate(c chan string, s string, limit float64) {
 	if rate, err := strconv.ParseFloat(strings.TrimRight(s, "%"), 64); err == nil {
 		if rate <= limit {
-			c <- fmt.Sprintf("NOTE: System is Busy, Avg Idle Rate %0.2f%s", rate, "%")
+			c <- _note(fmt.Sprintf(trans("System is Busy, Avg Idle Rate %0.2f%s"), rate, "%"))
 		} else {
-			c <- fmt.Sprintf("SUCC: System is Idle, Avg Idle Rate %0.2f%s", rate, "%")
+			c <- _succ(fmt.Sprintf(trans("System is Idle, Avg Idle Rate %0.2f%s"), rate, "%"))
 		}
 	} else {
 		c <- ""
@@ -341,9 +358,9 @@ func checkIdlerate(c chan string, s string, limit float64) {
 func checkLoadnow(c chan string, s string, limit float64) {
 	if load, err := strconv.ParseFloat(s, 64); err == nil {
 		if load >= limit {
-			c <- fmt.Sprintf("WARN: System Load Avg %0.2f", load)
+			c <- _warn(fmt.Sprintf(trans("System Load Avg %0.2f"), load))
 		} else {
-			c <- fmt.Sprintf("SUCC: System Load Avg %0.2f", load)
+			c <- _succ(fmt.Sprintf(trans("System Load Avg %0.2f"), load))
 		}
 	} else {
 		c <- ""
@@ -381,9 +398,9 @@ func checkMemUsage(c chan string, ss map[string]interface{}, limit float64) {
 
 	memusage = float64(memused * 100 / memtotal)
 	if memusage >= limit {
-		c <- fmt.Sprintf("WARN: Memory Usage %0.2f%s", memusage, "%")
+		c <- _warn(fmt.Sprintf(trans("Memory Usage %0.2f%s"), memusage, "%"))
 	} else {
-		c <- fmt.Sprintf("SUCC: Memory Usage %0.2f%s", memusage, "%")
+		c <- _succ(fmt.Sprintf(trans("Memory Usage %0.2f%s"), memusage, "%"))
 	}
 
 Exit:
@@ -397,9 +414,9 @@ func checkCpuUsage(c chan string, ss map[string]interface{}, limit float64) {
 		if id, err := strconv.ParseFloat(value, 64); err == nil {
 			usage := float64(100 - id)
 			if usage >= limit {
-				c <- fmt.Sprintf("WARN: CPU Usage %0.2f%s", usage, "%")
+				c <- _warn(fmt.Sprintf(trans("CPU Usage %0.2f%s"), usage, "%"))
 			} else {
-				c <- fmt.Sprintf("SUCC: CPU Usage %0.2f%s", usage, "%")
+				c <- _succ(fmt.Sprintf(trans("CPU Usage %0.2f%s"), usage, "%"))
 			}
 		} else {
 			goto Exit
@@ -452,11 +469,11 @@ func checkDiskUsage(c chan string, ss []interface{}, limit *inc.DiskUsage) {
 			if spaceUsed >= limit.Space {
 				warn++
 			}
-			tempstr += fmt.Sprintf(" SpaceUsed %0.2f%s,", spaceUsed, "%")
+			tempstr += fmt.Sprintf(trans(" SpaceUsed %0.2f%s,"), spaceUsed, "%")
 			if inodeUsed >= limit.Inode {
 				warn++
 			}
-			tempstr += fmt.Sprintf(" InodeUsed %0.2f%s", inodeUsed, "%")
+			tempstr += fmt.Sprintf(trans(" InodeUsed %0.2f%s"), inodeUsed, "%")
 			result += "\n\t" + mountValue + tempstr
 		default:
 			goto Exit
@@ -464,9 +481,9 @@ func checkDiskUsage(c chan string, ss []interface{}, limit *inc.DiskUsage) {
 	}
 
 	if warn > 0 {
-		c <- "WARN: Local Disk Space/Inode Usage" + result
+		c <- _warn(fmt.Sprintf(trans("Local Disk Space/Inode Usage"))) + result
 	} else {
-		c <- "SUCC: Local Disk Space/Inode Usage"
+		c <- _succ(fmt.Sprintf(trans("Local Disk Space/Inode Usage")))
 	}
 
 Exit:
@@ -514,9 +531,9 @@ func checkDiskFsio(c chan string, ss map[string]interface{}) {
 	}
 
 	if warn > 0 {
-		c <- "WARN: Local Disk FSstat/IOTest" + result
+		c <- _warn(trans("Local Disk FSstat/IOTest")) + result
 	} else {
-		c <- "SUCC: Local Disk FSstat/IOTest"
+		c <- _succ(trans("Local Disk FSstat/IOTest"))
 	}
 
 Exit:
@@ -525,15 +542,23 @@ Exit:
 
 func checkDnsbl(s string, cs []string) {
 	result := ""
+	ips := []string{}
 	if len(cs) > 0 { // if exposed address specified by config file
-		result = inc.Caller(inc.Checker["dnsbl"], cs)
+		ips = cs
 	} else if len(s) > 0 { // if auto detected exposed address
-		result = inc.Caller(inc.Checker["dnsbl"], []string{s})
+		ips = append(ips, s)
+	} else {
+		return
 	}
+	result = inc.Caller(inc.Checker["dnsbl"], ips)
 
 	warn, rest := parseCheckerOutput(result)
 	if warn > 0 {
-		fmt.Printf("WARN: %d IPAddress Listed in DNSBL\n%s\n", warn, rest)
+		fmt.Printf(_warn(trans("%d Exposed IPAddress Listed in DNSBL\n%s\n")), warn, rest)
+	} else {
+		if len(rest) > 0 {
+			fmt.Printf(_succ(trans("%d Exposed IPAddress NOT Listed in DNSBL\n")), len(ips))
+		}
 	}
 }
 
@@ -553,9 +578,9 @@ func checkMailStartups(ss []string, must []string) {
 	}
 	n := len(lost)
 	if n > 0 {
-		fmt.Printf("WARN: Lost %d eYou Product as System Startups: %v\n", n, lost)
+		fmt.Printf(_warn(trans("Lost %d eYou Product as System Startups: %v\n")), n, lost)
 	} else {
-		fmt.Printf("SUCC: %d eYou Product as System Startups Ready\n", len(must))
+		fmt.Printf(_succ(trans("%d eYou Product as System Startups Ready\n")), len(must))
 	}
 }
 
@@ -563,9 +588,9 @@ func checkSudoTTY() {
 	if reg, err := regexp.Compile("^Defaults[ \t]*requiretty"); err == nil {
 		file := "/etc/sudoers"
 		if inc.FGrepBool(file, reg) {
-			fmt.Printf("WARN: sudo Require TTY\n")
+			fmt.Printf(_warn(trans("sudo Require TTY\n")))
 		} else {
-			fmt.Printf("SUCC: sudo Ignore TTY\n")
+			fmt.Printf(_succ(trans("sudo Ignore TTY\n")))
 		}
 	}
 }
@@ -585,9 +610,9 @@ func checkMtaSvr(svr string, addrs string) {
 		result := inc.Caller(inc.Checker[svr], args)
 		warn, rest := parseCheckerOutput(result)
 		if warn > 0 {
-			fmt.Printf("WARN: %d %s Service Fail\n%s\n", warn, strings.ToUpper(svr), rest)
+			fmt.Printf(_warn(trans("%d %s Mail Service Fail\n%s\n")), warn, strings.ToUpper(svr), rest)
 		} else {
-			fmt.Printf("SUCC: %s Service\n", strings.ToUpper(svr))
+			fmt.Printf(_succ(trans("%s Mail Service\n")), strings.ToUpper(svr))
 		}
 	}
 }
@@ -721,9 +746,9 @@ func checkMailDBSvr(mysqladmin string, userdb, idxdb, logdb map[string]interface
 	result := inc.Caller(inc.Checker["mysqlping"], args)
 	warn, rest := parseCheckerOutput(result)
 	if warn > 0 {
-		fmt.Printf("CRIT: %d Mysql Backend Connection Fail\n%s\n", warn, rest)
+		fmt.Printf(_crit(trans("%d Mysql Backend Connection Fail\n%s\n")), warn, rest)
 	} else {
-		fmt.Printf("SUCC: Mysql Backend Connection\n")
+		fmt.Printf(_succ(trans("%d Mysql Backend Connection\n")), len(args)-1)
 	}
 }
 
@@ -751,7 +776,7 @@ func checkMailGMSvr(mysqlcli string, userdb map[string]interface{}, limit int64)
 	if len(arr) >= 2 {
 		if num, err := strconv.ParseInt(arr[0], 10, 64); err == nil {
 			if num >= limit {
-				fmt.Printf("WARN: Gearman Backend Queue %d\n", num)
+				fmt.Printf(_warn(trans("Gearman Backend Queue %d\n")), num)
 				details := strings.SplitN(arr[1], ",", -1)
 				for _, v := range details {
 					if len(strings.TrimSpace(v)) > 0 {
@@ -759,7 +784,7 @@ func checkMailGMSvr(mysqlcli string, userdb map[string]interface{}, limit int64)
 					}
 				}
 			} else {
-				fmt.Printf("SUCC: Gearman Backend Queue %d\n", num)
+				fmt.Printf(_succ(trans("Gearman Backend Queue %d\n")), num)
 			}
 		}
 	}
@@ -771,9 +796,9 @@ func checkMailQueue(limit int64) {
 	if len(arr) >= 1 {
 		if num, err := strconv.ParseInt(arr[0], 10, 64); err == nil {
 			if num >= limit {
-				fmt.Printf("WARN: Mail Queue %d\n", num)
+				fmt.Printf(_warn(trans("Mail Queue %d\n")), num)
 			} else {
-				fmt.Printf("SUCC: Mail Queue %d\n", num)
+				fmt.Printf(_succ(trans("Mail Queue %d\n")), num)
 			}
 		}
 	}
@@ -789,10 +814,10 @@ func checkMailMysqlRepl() {
 	result := inc.Caller(inc.Checker["mysqlrepl"], args)
 	warn, rest := parseCheckerOutput(result)
 	if warn > 0 {
-		fmt.Printf("CRIT: %d Mysql Replication Fail\n%s\n", warn, rest)
+		fmt.Printf(_crit(trans("%d Mysql Replication Fail\n%s\n")), warn, rest)
 	} else {
 		if len(rest) > 0 { // if indeed have result
-			fmt.Printf("SUCC: Mysql Replication\n")
+			fmt.Printf(_succ(trans("%d Mysql Replication\n")), len(args)-1)
 		}
 	}
 }
@@ -841,15 +866,28 @@ func trans(s string) string {
 	return mo.Gettext(s)
 }
 
-func succ(s string) string {
+func _succ(s string) string {
+	LevelMap["Succ"]++
 	return trans("SUCC: ") + s
 }
-func note(s string) string {
-	return trans("NOTE: ") + s
+func _note(s string) string {
+	LevelMap["Note"]++
+	return _yellow(trans("NOTE: ") + s)
 }
-func warn(s string) string {
-	return trans("WARN: ") + s
+func _warn(s string) string {
+	LevelMap["Warn"]++
+	return _red(trans("WARN: ") + s)
 }
-func crit(s string) string {
-	return trans("CRIT: ") + s
+func _crit(s string) string {
+	LevelMap["Crit"]++
+	return _purple(trans("CRIT: ") + s)
+}
+func _yellow(s string) string {
+	return "\033[1;33m" + s + "\033[0m"
+}
+func _red(s string) string {
+	return "\033[1;31m" + s + "\033[0m"
+}
+func _purple(s string) string {
+	return "\033[1;35m" + s + "\033[0m"
 }
