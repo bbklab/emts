@@ -52,6 +52,18 @@ msgstr "注意: "
 msgid "CRIT: "
 msgstr "严重: "
 
+msgid "SUCC"
+msgstr "正常"
+
+msgid "WARN"
+msgstr "警告"
+
+msgid "NOTE"
+msgstr "注意"
+
+msgid "CRIT"
+msgstr "严重"
+
 msgid "Lost %d System Startups: %v"
 msgstr "缺失 %d 个系统服务启动项: %v"
 
@@ -171,3 +183,6 @@ msgstr "%d 个Mysql复制异常\n%s\n"
 
 msgid "%d Mysql Replication\n"
 msgstr "%d 个Mysql复制正常\n"
+
+msgid "Result: %s:%s, %s:%s, %s:%s, %s:%s\nScore: %d\n"
+msgstr "结果: %s:%s, %s:%s, %s:%s, %s:%s\n得分: %d\n"

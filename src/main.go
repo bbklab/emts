@@ -73,7 +73,7 @@ func main() {
 	// Processing Result
 	process(jsonsinfo, config)
 
-	fmt.Println(LevelMap)
+	printResultSummary(LevelMap)
 
 	os.Exit(0)
 }
@@ -890,4 +890,22 @@ func _red(s string) string {
 }
 func _purple(s string) string {
 	return "\033[1;35m" + s + "\033[0m"
+}
+func _green(s string) string {
+	return "\033[1;32m" + s + "\033[0m"
+}
+
+func printResultSummary(s map[string]int) {
+	score := 100 - 40*s["Crit"] - 20*s["Warn"] - 5*s["Note"]
+	if score < 0 {
+		score = 0
+	}
+	fmt.Printf("\n------\n")
+	fmt.Printf(trans("Result: %s:%s, %s:%s, %s:%s, %s:%s\nScore: %d\n"),
+		trans("SUCC"), _green(strconv.Itoa(s["Succ"])),
+		trans("NOTE"), _yellow(strconv.Itoa(s["Note"])),
+		trans("WARN"), _red(strconv.Itoa(s["Warn"])),
+		trans("CRIT"), _purple(strconv.Itoa(s["Crit"])),
+		score,
+	)
 }
