@@ -38,7 +38,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	cfgfile := flag.String("c", "conf/config.json", "config file path")
+	cfgfile := flag.String("c", inc.GetAppRealDirPath()+"conf/config.json", "config file path")
 	flag.Parse()
 	config, err := inc.NewConfig(*cfgfile)
 	if err != nil {
