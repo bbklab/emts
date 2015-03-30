@@ -42,7 +42,7 @@ check(){
 				-w "%{http_code}" \
 				"${url}" 2>/dev/null)
 	elif [ "${prot}" == "http" ]; then
-		code=$(/usr/bin/curl \
+		code=$(/usr/bin/curl -k \
 				--location --max-redirs 3 \
 				--max-time ${time_out} -s -o /dev/null \
 				-w "%{http_code}" \
