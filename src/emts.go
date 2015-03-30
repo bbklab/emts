@@ -38,7 +38,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	cfgfile := flag.String("c", inc.GetAppRealDirPath()+"conf/config.json", "config file path")
+	cfgfile := flag.String("c", inc.GetAppRealDirPath()+"/conf/config.json", "config file path")
 	flag.Parse()
 	config, err := inc.NewConfig(*cfgfile)
 	if err != nil {
@@ -665,7 +665,7 @@ func checkMailDBSvr(mysqladmin string, userdb, idxdb, logdb map[string]interface
 		"idx": []string{"dbumi_mysql_dsn", "dbumi_mysql_user", "dbumi_mysql_pass",
 			"mta_dbumi_mysql_dsn", "mta_dbumi_mysql_user", "mta_dbumi_mysql_pass",
 		},
-		"log": []string{"dblog_mysql_host", "dblog_mysql_port", "dblog_mysql_user", "dblog_mysql_user"},
+		"log": []string{"dblog_mysql_host", "dblog_mysql_port", "dblog_mysql_user", "dblog_mysql_pass"},
 	}
 	for name, conf := range dbcfg {
 		temp := ""
