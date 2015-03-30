@@ -684,12 +684,8 @@ func checkMailDBSvr(mysqladmin string, userdb, idxdb, logdb map[string]interface
 	args := make([]string, 0)
 	args = append(args, mysqladmin)
 	dbcfg := map[string][]string{
-		"usr": []string{"db_mysql_host", "db_mysql_port", "db_mysql_user", "db_mysql_pass",
-			"mta_db_mysql_host", "mta_db_mysql_port", "mta_db_mysql_user", "mta_db_mysql_pass",
-		},
-		"idx": []string{"dbumi_mysql_dsn", "dbumi_mysql_user", "dbumi_mysql_pass",
-			"mta_dbumi_mysql_dsn", "mta_dbumi_mysql_user", "mta_dbumi_mysql_pass",
-		},
+		"usr": []string{"db_mysql_host", "db_mysql_port", "db_mysql_user", "db_mysql_pass"},
+		"idx": []string{"dbumi_mysql_dsn", "dbumi_mysql_user", "dbumi_mysql_pass"},
 		"log": []string{"dblog_mysql_host", "dblog_mysql_port", "dblog_mysql_user", "dblog_mysql_pass"},
 	}
 	for name, conf := range dbcfg {
@@ -732,19 +728,14 @@ func checkMailDBSvr(mysqladmin string, userdb, idxdb, logdb map[string]interface
 						for _, dsn := range v {
 							switch vdsn := dsn.(type) {
 							case string:
+								temp := ""
 								if strings.Contains(vdsn, "host=") {
-									arr := strings.Split(vdsn, ";")
-									if len(arr) >= 3 {
-										host := strings.Replace(arr[0], "host=", "", -1)
-										port := strings.Replace(arr[1], "port=", "", -1)
-										dsnhead = append(dsnhead, host+","+port)
-									}
+									temp = parseMysqlDsn(vdsn, "host")
 								} else if strings.Contains(vdsn, "unix_socket=") {
-									arr := strings.Split(vdsn, ";")
-									if len(arr) >= 2 {
-										unixsock := strings.Replace(arr[0], "unix_socket=", "", -1)
-										dsnhead = append(dsnhead, unixsock)
-									}
+									temp = parseMysqlDsn(vdsn, "unixsock")
+								}
+								if len(temp) > 0 {
+									dsnhead = append(dsnhead, temp)
 								}
 							}
 						}
@@ -777,6 +768,24 @@ func checkMailDBSvr(mysqladmin string, userdb, idxdb, logdb map[string]interface
 		fmt.Printf(_succ(trans("%d Mysql Backend Connection\n")),
 			len(args)-1)
 	}
+}
+
+func parseMysqlDsn(s string, t string) (r string) {
+	switch t {
+	case "host":
+		arr := strings.Split(s, ";")
+		if len(arr) >= 3 {
+			host := strings.Replace(arr[0], "host=", "", -1)
+			port := strings.Replace(arr[1], "port=", "", -1)
+			r = host + "," + port
+		}
+	case "unixsock":
+		arr := strings.Split(s, ";")
+		if len(arr) >= 2 {
+			r = strings.Replace(arr[0], "unix_socket=", "", -1)
+		}
+	}
+	return
 }
 
 func checkMailGMSvr(mysqlcli string, userdb map[string]interface{}, limit int64) {
