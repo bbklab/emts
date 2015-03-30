@@ -254,21 +254,15 @@ sub fill_mail_config {
 					remote_relay_domain remote_enable_replace_domain remote_replace_domain )
 				   ],
 		# how to connect user mysql server
-		'usrdb'		=> [ qw( db_mysql_user db_mysql_pass db_mysql_host db_mysql_port db_name
-					mta_db_mysql_user mta_db_mysql_pass mta_db_mysql_host mta_db_mysql_port
-					)
-				   ],
+		'usrdb'		=> [ qw( db_mysql_user db_mysql_pass db_mysql_host db_mysql_port db_name ) ],
+		# how to connect user mysql server through mproxy
+		'pusrdb'	=> [ qw( mta_db_mysql_user mta_db_mysql_pass mta_db_mysql_host mta_db_mysql_port ) ],
 		# how to connect index mysql server
-		'idxdb'		=> [ qw(
-					dbumi_mysql_user dbumi_mysql_pass dbumi_mysql_dsn
-					mta_dbumi_mysql_user mta_dbumi_mysql_pass mta_dbumi_mysql_dsn 
-					)
-				   ],
+		'idxdb'		=> [ qw( dbumi_mysql_user dbumi_mysql_pass dbumi_mysql_dsn ) ],
+		# how to connect index mysql server through mproxy
+		'pidxdb'	=> [ qw( mta_dbumi_mysql_user mta_dbumi_mysql_pass mta_dbumi_mysql_dsn ) ],
 		# how to connect log mysql server
-		'logdb'		=> [ qw(
-					dblog_mysql_user dblog_mysql_pass dblog_mysql_host dblog_mysql_port dblog_name
-					)
-				   ],
+		'logdb'		=> [ qw( dblog_mysql_user dblog_mysql_pass dblog_mysql_host dblog_mysql_port dblog_name ) ],
 		# how to connect memcache server
 		'memcache'	=> [ qw(memcache_session memcache_fix memcache_hot) ],
 		# how to connect filed server
