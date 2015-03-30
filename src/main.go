@@ -177,13 +177,13 @@ func process(sinfo *sjson.Json, config *inc.Config) {
 		begin eyou mail related check
 	*/
 	if sysStartups, err := sinfo.Get("startups").StringArray(); err == nil {
-		go checkMailStartups(sysStartups, []string{"eyou_mail"})
+		checkMailStartups(sysStartups, []string{"eyou_mail"})
 	}
 
-	go checkSudoTTY()
+	checkSudoTTY()
 
 	mailSvrAddr := sinfo.Get("epinfo").Get("mail").Get("config").Get("svraddr").MustMap()
-	go checkMailSvr(mailSvrAddr)
+	checkMailSvr(mailSvrAddr)
 
 	// get eyou mail startups
 	arrMailStartups, err := sinfo.Get("epinfo").Get("mail").Get("startups").StringArray()
@@ -195,19 +195,19 @@ func process(sinfo *sjson.Json, config *inc.Config) {
 	// if mail startups contains phpd
 	if strings.Contains(strMailStartups, "phpd") {
 		mailConfigs := sinfo.Get("epinfo").Get("mail").MustMap()
-		go checkMailPhpd(mailConfigs, config.GMQueueLimit)
+		checkMailPhpd(mailConfigs, config.GMQueueLimit)
 	}
 
 	// if mail startups contains remote or local
 	if strings.Contains(strMailStartups, "remote") || strings.Contains(strMailStartups, "local") {
-		go checkMailQueue(config.QueueLimit)
+		checkMailQueue(config.QueueLimit)
 	}
 
 	// if mail startups contains mysql backedn
 	if strings.Contains(strMailStartups, "mysql") ||
 		strings.Contains(strMailStartups, "mysql_index") ||
 		strings.Contains(strMailStartups, "mysql_log") {
-		go checkMailMysqlRepl() // don't check if is slave, as caller return nothing if not slave
+		checkMailMysqlRepl() // don't check if is slave, as caller return nothing if not slave
 	}
 }
 
