@@ -198,6 +198,15 @@ func process(sinfo *sjson.Json, config *inc.Config) {
 		checkMailPhpd(mailConfigs, config.GMQueueLimit)
 	}
 
+	// if mail startups contains pop/pop3 or smtp or imap
+	if strings.Contains(strMailStartups, "pop3") ||
+		strings.Contains(strMailStartups, "pop") ||
+		strings.Contains(strMailStartups, "smtp") ||
+		strings.Contains(strMailStartups, "imap") {
+		mailConfigs := sinfo.Get("epinfo").Get("mail").MustMap()
+		checkMailMproxySvr(mailConfigs)
+	}
+
 	// if mail startups contains remote or local
 	if strings.Contains(strMailStartups, "remote") || strings.Contains(strMailStartups, "local") {
 		checkMailQueue(config.QueueLimit)
@@ -685,87 +694,184 @@ func checkMailDBSvr(mysqladmin string, userdb, idxdb, logdb map[string]interface
 	args = append(args, mysqladmin)
 	dbcfg := map[string][]string{
 		"usr": []string{"db_mysql_host", "db_mysql_port", "db_mysql_user", "db_mysql_pass"},
-		"idx": []string{"dbumi_mysql_dsn", "dbumi_mysql_user", "dbumi_mysql_pass"},
 		"log": []string{"dblog_mysql_host", "dblog_mysql_port", "dblog_mysql_user", "dblog_mysql_pass"},
+		"idx": []string{"dbumi_mysql_dsn", "dbumi_mysql_user", "dbumi_mysql_pass"},
 	}
-	for name, conf := range dbcfg {
-		temp := ""
-		switch name {
-		case "usr":
-			for i, _ := range conf {
-				switch v := userdb[conf[i]].(type) {
-				case string:
-					if i%4 == 3 {
-						temp += v
-						args = append(args, temp)
-						temp = ""
-					} else {
-						temp += v + ","
-					}
-				}
+
+	temp := ""
+
+	//parse usrdb
+	for i, _ := range dbcfg["usr"] {
+		switch v := userdb[dbcfg["usr"][i]].(type) {
+		case string:
+			if i%4 == 3 {
+				temp += v
+				args = append(args, temp)
+				temp = ""
+			} else {
+				temp += v + ","
 			}
-		case "log":
-			for i, _ := range conf {
-				switch v := logdb[conf[i]].(type) {
-				case string:
-					if i%4 == 3 {
-						temp += v
-						args = append(args, temp)
-						temp = ""
-					} else {
-						temp += v + ","
-					}
-				}
+		}
+	}
+	// parse logdb
+	for i, _ := range dbcfg["log"] {
+		switch v := logdb[dbcfg["log"][i]].(type) {
+		case string:
+			if i%4 == 3 {
+				temp += v
+				args = append(args, temp)
+				temp = ""
+			} else {
+				temp += v + ","
 			}
-		case "idx":
-			dsnhead := []string{}
-			user := ""
-			pass := ""
-			for i, _ := range conf {
-				if i%3 == 0 { // parse dsn
-					switch v := idxdb[conf[i]].(type) {
-					case []interface{}:
-						for _, dsn := range v {
-							switch vdsn := dsn.(type) {
-							case string:
-								temp := ""
-								if strings.Contains(vdsn, "host=") {
-									temp = parseMysqlDsn(vdsn, "host")
-								} else if strings.Contains(vdsn, "unix_socket=") {
-									temp = parseMysqlDsn(vdsn, "unixsock")
-								}
-								if len(temp) > 0 {
-									dsnhead = append(dsnhead, temp)
-								}
-							}
-						}
-					}
-				} else if i%3 == 1 { // parse user
-					switch v := idxdb[conf[i]].(type) {
-					case string:
-						user = v
-					}
-				} else if i%3 == 2 { // parse pass
-					switch v := idxdb[conf[i]].(type) {
-					case string:
-						pass = v
-						for _, head := range dsnhead {
-							args = append(args, head+","+user+","+pass)
-						}
-						dsnhead = []string{} // emtpy dsnhead []
-					}
+		}
+	}
+	// parse idxdb
+	dsnhead := []string{}
+	user := ""
+	pass := ""
+	// parse dsn
+	switch v := idxdb[dbcfg["idx"][0]].(type) {
+	case []interface{}:
+		for _, dsn := range v { // dns is an array
+			switch vdsn := dsn.(type) {
+			case string:
+				temp := ""
+				if strings.Contains(vdsn, "host=") {
+					temp = parseMysqlDsn(vdsn, "host")
+				} else if strings.Contains(vdsn, "unix_socket=") {
+					temp = parseMysqlDsn(vdsn, "unixsock")
+				}
+				if len(temp) > 0 {
+					dsnhead = append(dsnhead, temp)
 				}
 			}
 		}
 	}
+	// parse user
+	switch v := idxdb[dbcfg["idx"][1]].(type) {
+	case string:
+		user = v
+	}
+	// parse pass
+	switch v := idxdb[dbcfg["idx"][2]].(type) {
+	case string:
+		pass = v
+	}
+	// add each dnshead before user and pass
+	for _, head := range dsnhead {
+		args = append(args, head+","+user+","+pass)
+	}
+
 	// Oh! finally finished! WTF!
 	result := inc.Caller(inc.Checker["mysqlping"], args)
 	warn, rest := parseCheckerOutput(result)
 	if warn > 0 {
-		fmt.Printf(_crit(trans("%d Mysql Backend Connection Fail\n%s\n")),
-			warn, rest)
+		fmt.Printf(_crit(trans("%d/%d Mysql Backend Connection Fail\n%s\n")),
+			warn, len(args)-1, rest)
 	} else {
 		fmt.Printf(_succ(trans("%d Mysql Backend Connection\n")),
+			len(args)-1)
+	}
+}
+
+func checkMailMproxySvr(mailcfg map[string]interface{}) {
+	mailcfg_tools := mailcfg["tools"]
+	mailcfg_config := mailcfg["config"]
+	var mailMysqlAdmin string
+	var mailMproxyUsrMysql, mailMproxyIdxMysql map[string]interface{}
+	switch tools := mailcfg_tools.(type) {
+	case map[string]interface{}:
+		switch v := tools["mysqladmin"].(type) {
+		case string:
+			mailMysqlAdmin = v
+		}
+	}
+	switch config := mailcfg_config.(type) {
+	case map[string]interface{}:
+		switch v := config["pusrdb"].(type) {
+		case map[string]interface{}:
+			mailMproxyUsrMysql = v
+		}
+		switch v := config["pidxdb"].(type) {
+		case map[string]interface{}:
+			mailMproxyIdxMysql = v
+		}
+	}
+	checkMproxySvr(mailMysqlAdmin, mailMproxyUsrMysql, mailMproxyIdxMysql)
+}
+
+func checkMproxySvr(mysqladmin string, puserdb, pidxdb map[string]interface{}) {
+	if mysqladmin == "" {
+		return
+	}
+	args := make([]string, 0)
+	args = append(args, mysqladmin)
+	dbcfg := map[string][]string{
+		"pusr": []string{"mta_db_mysql_host", "mta_db_mysql_port", "mta_db_mysql_user", "mta_db_mysql_pass"},
+		"pidx": []string{"mta_dbumi_mysql_dsn", "mta_dbumi_mysql_user", "mta_dbumi_mysql_pass"},
+	}
+
+	temp := ""
+
+	//parse mproxy usrdb
+	for i, _ := range dbcfg["pusr"] {
+		switch v := puserdb[dbcfg["pusr"][i]].(type) {
+		case string:
+			if i%4 == 3 {
+				temp += v
+				args = append(args, temp)
+				temp = ""
+			} else {
+				temp += v + ","
+			}
+		}
+	}
+	// parse mproxy idxdb
+	dsnhead := []string{}
+	user := ""
+	pass := ""
+	// parse dsn
+	switch v := pidxdb[dbcfg["pidx"][0]].(type) {
+	case []interface{}:
+		for _, dsn := range v { // dns is an array
+			switch vdsn := dsn.(type) {
+			case string:
+				temp := ""
+				if strings.Contains(vdsn, "host=") {
+					temp = parseMysqlDsn(vdsn, "host")
+				} else if strings.Contains(vdsn, "unix_socket=") {
+					temp = parseMysqlDsn(vdsn, "unixsock")
+				}
+				if len(temp) > 0 {
+					dsnhead = append(dsnhead, temp)
+				}
+			}
+		}
+	}
+	// parse user
+	switch v := pidxdb[dbcfg["pidx"][1]].(type) {
+	case string:
+		user = v
+	}
+	// parse pass
+	switch v := pidxdb[dbcfg["pidx"][2]].(type) {
+	case string:
+		pass = v
+	}
+	// add each dnshead before user and pass
+	for _, head := range dsnhead {
+		args = append(args, head+","+user+","+pass)
+	}
+
+	// Oh! finally finished! WTF!
+	result := inc.Caller(inc.Checker["mysqlping"], args)
+	warn, rest := parseCheckerOutput(result)
+	if warn > 0 {
+		fmt.Printf(_crit(trans("%d/%d Mysql Proxy Backend Connection Fail\n%s\n")),
+			warn, len(args)-1, rest)
+	} else {
+		fmt.Printf(_succ(trans("%d Mysql Proxy Backend Connection\n")),
 			len(args)-1)
 	}
 }
