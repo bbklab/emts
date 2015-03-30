@@ -41,7 +41,7 @@ check_rc "copy related dirs"
 cd ${tempdir}
 check_rc "changing into ${tempdir}"
 
-/bin/tar -czvf ../emts.tgz "emts"
+/bin/tar -czvf ../emts.tgz "emts" 2>&1 1>/dev/null
 check_rc "make tarball on emts/"
 
 cd ../
