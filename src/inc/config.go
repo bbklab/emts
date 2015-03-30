@@ -8,6 +8,7 @@ import (
 
 type Config struct {
 	SysLoadUplimit int
+	JobTimeOut     int // no use for now
 	SuperUserNum   int
 	SeqRetransRate float64
 	UdpLostRate    float64

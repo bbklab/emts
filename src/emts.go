@@ -12,6 +12,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 
 	"inc"
 )
@@ -57,13 +58,6 @@ func main() {
 		output("E_Collect_FAIL on Sinfo")
 		os.Exit(1)
 	}
-	/* replace by go-simplejson
-	var StructSinfo interface{}
-	if err := json.Unmarshal([]byte(sinfo), &StructSinfo); err != nil {
-		output("E_UnMarshal_FAIL on Sinfo: " + err.Error())
-		os.Exit(1)
-	}
-	*/
 	jsonsinfo, err := sjson.NewJson([]byte(sinfo))
 	if err != nil {
 		fmt.Println(trans("E_UnMarshal_FAIL on Sinfo"), err.Error())
@@ -81,6 +75,13 @@ func main() {
 func process(sinfo *sjson.Json, config *inc.Config) {
 	c := make(chan string)
 	n := 0
+
+	// first set var about eyou product isInstalled ?
+	mailIsInstalled := sinfo.Get("epinfo").Get("mail").Get("is_installed").MustInt()
+	//mail4IsInstalled := sinfo.Get("epinfo").Get("mail4").Get("is_installed").MustInt()
+	//gwIsInstalled := sinfo.Get("epinfo").Get("gw").Get("is_installed").MustInt()
+	//archiveIsInstalled := sinfo.Get("epinfo").Get("archive").Get("is_installed").MustInt()
+	//epushIsInstalled := sinfo.Get("epinfo").Get("epush").Get("is_installed").MustInt()
 
 	if sysStartups, err := sinfo.Get("startups").StringArray(); err == nil {
 		must := []string{"network", "sshd"}
@@ -150,14 +151,25 @@ func process(sinfo *sjson.Json, config *inc.Config) {
 	go checkDiskFsio(c, diskFsio)
 	n++
 
+	isTimeout := make(chan bool, 1)
+	go func() {
+		time.Sleep(30 * time.Second)
+		isTimeout <- true
+	}()
+
 	i := 0
 	for {
-		s := <-c
-		i++
-		if len(s) > 0 {
-			fmt.Println(s)
-		}
-		if i >= n {
+		select {
+		case s := <-c:
+			i++
+			if len(s) > 0 {
+				fmt.Println(s)
+			}
+			if i >= n { // all job finished
+				break
+			}
+		case <-isTimeout:
+			fmt.Println("JobTimOut")
 			break
 		}
 	}
@@ -168,14 +180,15 @@ func process(sinfo *sjson.Json, config *inc.Config) {
 	exposedAddr := sinfo.Get("epinfo").Get("common").Get("exposed").MustString()
 	checkDnsbl(exposedAddr, config.ExposedIP)
 
-	mailIsInstalled := sinfo.Get("epinfo").Get("mail").Get("is_installed").MustInt()
+	/*
+		begin eyou mail related check
+	*/
+
+	// first check if eyou mail installed or not ?
 	if mailIsInstalled == 0 {
 		return
 	}
 
-	/*
-		begin eyou mail related check
-	*/
 	if sysStartups, err := sinfo.Get("startups").StringArray(); err == nil {
 		checkMailStartups(sysStartups, []string{"eyou_mail"})
 	}
