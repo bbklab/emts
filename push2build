@@ -1,0 +1,35 @@
+#!/bin/bash
+
+#
+# result of this script is directory:  /data/emts_codes/src/
+#
+
+basedir="$(cd $(dirname $0);pwd)"
+srcdir="${basedir}/src"
+
+
+# Func Def
+check_rc() {
+  if [ $? == 0 ]; then
+        echo -e " -- $(date +%F_%T)  succed!  ${*}"
+  else
+        echo -e " -- $(date +%F_%T)  failed!  ${*}"; exit 1
+  fi
+}
+
+
+### Main Body Begin ...
+
+
+if [ "$(id -u)" != "0" ]; then
+  echo " root privileges required! "
+  exit 1
+fi
+
+destdir="/data/emts_codes"
+
+/bin/rm -rf "${destdir}/${srcdir##*/}"
+check_rc "remove dest source dir"
+
+/bin/cp -a "${srcdir}"  "${destdir}/"
+check_rc "copy source dir"
