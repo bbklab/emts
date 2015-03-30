@@ -17,5 +17,10 @@
   "ExposedIP":      [
   ],
   "GMQueueLimit":   100,
-  "QueueLimit":     300
+  "QueueLimit":     300,
+  "MailLicense":    {
+    "RemainRate": 10.00,
+    "RemainSum":  100,
+    "RemainDay":  30
+  }
 }

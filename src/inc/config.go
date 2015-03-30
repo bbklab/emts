@@ -22,11 +22,18 @@ type Config struct {
 	ExposedIP      []string
 	GMQueueLimit   int64
 	QueueLimit     int64
+	MailLicense    *MailLicense
 }
 
 type DiskUsage struct {
 	Inode float64
 	Space float64
+}
+
+type MailLicense struct {
+	RemainRate float64
+	RemainSum  int64
+	RemainDay  int64
 }
 
 func NewConfig(cfile string) (*Config, error) {
