@@ -8,6 +8,7 @@ import (
 
 type Config struct {
 	SysLoadUplimit int
+	SuperUserNum   int
 	SeqRetransRate float64
 	UdpLostRate    float64
 	ProcessSum     int

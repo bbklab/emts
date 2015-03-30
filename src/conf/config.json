@@ -1,5 +1,6 @@
 {
   "SysLoadUplimit": 10,
+  "SuperUserNum":   1,
   "SeqRetransRate": 10.00,
   "UdpLostRate":    10.00,
   "ProcessSum":     1000,

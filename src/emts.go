@@ -89,7 +89,7 @@ func process(sinfo *sjson.Json, config *inc.Config) {
 	}
 
 	sysSuperUsers := sinfo.Get("supuser").MustArray()
-	go checkSuperUser(c, sysSuperUsers)
+	go checkSuperUser(c, sysSuperUsers, config.SuperUserNum)
 	n++
 
 	sysSelinux := sinfo.Get("selinux").MustMap()
@@ -233,12 +233,12 @@ func checkSysStartups(c chan string, ss []string, must []string) {
 	}
 }
 
-func checkSuperUser(c chan string, ss []interface{}) {
+func checkSuperUser(c chan string, ss []interface{}, limit int) {
 	n := len(ss)
-	if n > 1 {
+	if n > limit {
 		c <- _warn(fmt.Sprintf(trans("%d System Super Privileged Users"), n))
 	} else {
-		c <- _succ(fmt.Sprintf(trans("System Super User")))
+		c <- _succ(fmt.Sprintf(trans("%d System Super User"), n))
 	}
 }
 

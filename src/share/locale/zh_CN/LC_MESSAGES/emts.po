@@ -73,8 +73,8 @@ msgstr "%d 个必须的系统服务启动项就绪"
 msgid "%d System Super Privileged Users"
 msgstr "%d 个系统特权用户"
 
-msgid "System Super User"
-msgstr "系统特权用户"
+msgid "%d System Super User"
+msgstr "%d 个系统特权用户"
 
 msgid "Selinux Enforcing"
 msgstr "Selinux 开启中"
