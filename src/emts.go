@@ -227,18 +227,22 @@ func checkSysStartups(c chan string, ss []string, must []string) {
 	}
 	n := len(lost)
 	if n > 0 {
-		c <- _warn(fmt.Sprintf(trans("Lost %d System Startups: %v"), n, lost))
+		c <- _warn(fmt.Sprintf(trans("Lost %d System Startups: %v"),
+			n, lost))
 	} else {
-		c <- _succ(fmt.Sprintf(trans("%d System Startups Ready"), len(must)))
+		c <- _succ(fmt.Sprintf(trans("%d System Startups Ready"),
+			len(must)))
 	}
 }
 
 func checkSuperUser(c chan string, ss []interface{}, limit int) {
 	n := len(ss)
 	if n > limit {
-		c <- _warn(fmt.Sprintf(trans("%d System Super Privileged Users"), n))
+		c <- _warn(fmt.Sprintf(trans("%d System Super Privileged Users"),
+			n))
 	} else {
-		c <- _succ(fmt.Sprintf(trans("%d System Super User"), n))
+		c <- _succ(fmt.Sprintf(trans("%d System Super User"),
+			n))
 	}
 }
 
@@ -252,9 +256,11 @@ func checkSelinux(c chan string, ss map[string]interface{}) {
 
 func checkHostName(c chan string, hostname string) {
 	if hostname == "localhost" || hostname == "localhost.localdomain" {
-		c <- _note(fmt.Sprintf(trans("ReName the host a Better Name other than [%s]"), hostname))
+		c <- _note(fmt.Sprintf(trans("ReName the host a Better Name other than [%s]"),
+			hostname))
 	} else {
-		c <- _succ(fmt.Sprintf(trans("Hostname [%s]"), hostname))
+		c <- _succ(fmt.Sprintf(trans("Hostname [%s]"),
+			hostname))
 	}
 }
 
@@ -263,12 +269,15 @@ func checkMemorySize(c chan string, bitmode, memsize, kernelrls string) {
 		memSize := int64(msize / 1024 / 1024)
 		if memSize >= 4 && bitmode == "32" {
 			if strings.Contains(kernelrls, "PAE") {
-				c <- _succ(fmt.Sprintf(trans("%sbit OS with %dGB Memory and PAE Kernel"), bitmode, memSize))
+				c <- _succ(fmt.Sprintf(trans("%sbit OS with %dGB Memory and PAE Kernel"),
+					bitmode, memSize))
 			} else {
-				c <- _note(fmt.Sprintf(trans("%sbit OS with %dGB Memory and without PAE Kernel"), bitmode, memSize))
+				c <- _note(fmt.Sprintf(trans("%sbit OS with %dGB Memory and without PAE Kernel"),
+					bitmode, memSize))
 			}
 		} else {
-			c <- _succ(fmt.Sprintf(trans("%sbit OS with %dGB Memory"), bitmode, memSize))
+			c <- _succ(fmt.Sprintf(trans("%sbit OS with %dGB Memory"),
+				bitmode, memSize))
 		}
 	} else {
 		c <- ""
@@ -292,9 +301,11 @@ func checkSeqRetransRate(c chan string, ss map[string]interface{}, limit float64
 	case string:
 		if rate, err := strconv.ParseFloat((strings.TrimRight(value, "%")), 64); err == nil {
 			if rate >= limit {
-				c <- _note(fmt.Sprintf(trans("Tcp Sequence Retransfer Rate %0.2f%s"), rate, "%"))
+				c <- _note(fmt.Sprintf(trans("Tcp Sequence Retransfer Rate %0.2f%s"),
+					rate, "%"))
 			} else {
-				c <- _succ(fmt.Sprintf(trans("Tcp Sequence Retransfer Rate %0.2f%s"), rate, "%"))
+				c <- _succ(fmt.Sprintf(trans("Tcp Sequence Retransfer Rate %0.2f%s"),
+					rate, "%"))
 			}
 		} else {
 			c <- ""
@@ -310,9 +321,11 @@ func checkUdpLostRate(c chan string, ss map[string]interface{}, limit float64) {
 	case string:
 		if rate, err := strconv.ParseFloat((strings.TrimRight(value, "%")), 64); err == nil {
 			if rate >= limit {
-				c <- _note(fmt.Sprintf(trans("Udp Packet Lost Rate %0.2f%s"), rate, "%"))
+				c <- _note(fmt.Sprintf(trans("Udp Packet Lost Rate %0.2f%s"),
+					rate, "%"))
 			} else {
-				c <- _succ(fmt.Sprintf(trans("Udp Packet Lost Rate %0.2f%s"), rate, "%"))
+				c <- _succ(fmt.Sprintf(trans("Udp Packet Lost Rate %0.2f%s"),
+					rate, "%"))
 			}
 		} else {
 			c <- ""
@@ -346,9 +359,11 @@ func checkRuntime(c chan string, s string, limit int) {
 func checkIdlerate(c chan string, s string, limit float64) {
 	if rate, err := strconv.ParseFloat(strings.TrimRight(s, "%"), 64); err == nil {
 		if rate <= limit {
-			c <- _note(fmt.Sprintf(trans("System is Busy, Avg Idle Rate %0.2f%s"), rate, "%"))
+			c <- _note(fmt.Sprintf(trans("System is Busy, Avg Idle Rate %0.2f%s"),
+				rate, "%"))
 		} else {
-			c <- _succ(fmt.Sprintf(trans("System is Idle, Avg Idle Rate %0.2f%s"), rate, "%"))
+			c <- _succ(fmt.Sprintf(trans("System is Idle, Avg Idle Rate %0.2f%s"),
+				rate, "%"))
 		}
 	} else {
 		c <- ""
@@ -398,9 +413,11 @@ func checkMemUsage(c chan string, ss map[string]interface{}, limit float64) {
 
 	memusage = float64(memused * 100 / memtotal)
 	if memusage >= limit {
-		c <- _warn(fmt.Sprintf(trans("Memory Usage %0.2f%s"), memusage, "%"))
+		c <- _warn(fmt.Sprintf(trans("Memory Usage %0.2f%s"),
+			memusage, "%"))
 	} else {
-		c <- _succ(fmt.Sprintf(trans("Memory Usage %0.2f%s"), memusage, "%"))
+		c <- _succ(fmt.Sprintf(trans("Memory Usage %0.2f%s"),
+			memusage, "%"))
 	}
 
 Exit:
@@ -414,9 +431,11 @@ func checkCpuUsage(c chan string, ss map[string]interface{}, limit float64) {
 		if id, err := strconv.ParseFloat(value, 64); err == nil {
 			usage := float64(100 - id)
 			if usage >= limit {
-				c <- _warn(fmt.Sprintf(trans("CPU Usage %0.2f%s"), usage, "%"))
+				c <- _warn(fmt.Sprintf(trans("CPU Usage %0.2f%s"),
+					usage, "%"))
 			} else {
-				c <- _succ(fmt.Sprintf(trans("CPU Usage %0.2f%s"), usage, "%"))
+				c <- _succ(fmt.Sprintf(trans("CPU Usage %0.2f%s"),
+					usage, "%"))
 			}
 		} else {
 			goto Exit
@@ -554,10 +573,12 @@ func checkDnsbl(s string, cs []string) {
 
 	warn, rest := parseCheckerOutput(result)
 	if warn > 0 {
-		fmt.Printf(_warn(trans("%d Exposed IPAddress Listed in DNSBL\n%s\n")), warn, rest)
+		fmt.Printf(_warn(trans("%d Exposed IPAddress Listed in DNSBL\n%s\n")),
+			warn, rest)
 	} else {
 		if len(rest) > 0 {
-			fmt.Printf(_succ(trans("%d Exposed IPAddress NOT Listed in DNSBL\n")), len(ips))
+			fmt.Printf(_succ(trans("%d Exposed IPAddress NOT Listed in DNSBL\n")),
+				len(ips))
 		}
 	}
 }
@@ -578,9 +599,11 @@ func checkMailStartups(ss []string, must []string) {
 	}
 	n := len(lost)
 	if n > 0 {
-		fmt.Printf(_warn(trans("Lost %d eYou Product as System Startups: %v\n")), n, lost)
+		fmt.Printf(_warn(trans("Lost %d eYou Product as System Startups: %v\n")),
+			n, lost)
 	} else {
-		fmt.Printf(_succ(trans("%d eYou Product as System Startups Ready\n")), len(must))
+		fmt.Printf(_succ(trans("%d eYou Product as System Startups Ready\n")),
+			len(must))
 	}
 }
 
@@ -610,9 +633,11 @@ func checkMtaSvr(svr string, addrs string) {
 		result := inc.Caller(inc.Checker[svr], args)
 		warn, rest := parseCheckerOutput(result)
 		if warn > 0 {
-			fmt.Printf(_warn(trans("%d %s Mail Service Fail\n%s\n")), warn, strings.ToUpper(svr), rest)
+			fmt.Printf(_warn(trans("%d %s Mail Service Fail\n%s\n")),
+				warn, strings.ToUpper(svr), rest)
 		} else {
-			fmt.Printf(_succ(trans("%s Mail Service\n")), strings.ToUpper(svr))
+			fmt.Printf(_succ(trans("%s Mail Service\n")),
+				strings.ToUpper(svr))
 		}
 	}
 }
@@ -746,9 +771,11 @@ func checkMailDBSvr(mysqladmin string, userdb, idxdb, logdb map[string]interface
 	result := inc.Caller(inc.Checker["mysqlping"], args)
 	warn, rest := parseCheckerOutput(result)
 	if warn > 0 {
-		fmt.Printf(_crit(trans("%d Mysql Backend Connection Fail\n%s\n")), warn, rest)
+		fmt.Printf(_crit(trans("%d Mysql Backend Connection Fail\n%s\n")),
+			warn, rest)
 	} else {
-		fmt.Printf(_succ(trans("%d Mysql Backend Connection\n")), len(args)-1)
+		fmt.Printf(_succ(trans("%d Mysql Backend Connection\n")),
+			len(args)-1)
 	}
 }
 
@@ -814,10 +841,12 @@ func checkMailMysqlRepl() {
 	result := inc.Caller(inc.Checker["mysqlrepl"], args)
 	warn, rest := parseCheckerOutput(result)
 	if warn > 0 {
-		fmt.Printf(_crit(trans("%d Mysql Replication Fail\n%s\n")), warn, rest)
+		fmt.Printf(_crit(trans("%d Mysql Replication Fail\n%s\n")),
+			warn, rest)
 	} else {
 		if len(rest) > 0 { // if indeed have result
-			fmt.Printf(_succ(trans("%d Mysql Replication\n")), len(args)-1)
+			fmt.Printf(_succ(trans("%d Mysql Replication\n")),
+				len(args)-1)
 		}
 	}
 }
