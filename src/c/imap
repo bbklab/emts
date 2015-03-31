@@ -143,6 +143,7 @@ while(@ARGV) {
   }
 
   BREAK: {
+	$imap->close() if $imap;
         next;
   };
 }

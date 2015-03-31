@@ -134,6 +134,7 @@ while(@ARGV) {
   }
 
   BREAK: {
+	$pop->close() if $pop;
 	next;
   };
 }
