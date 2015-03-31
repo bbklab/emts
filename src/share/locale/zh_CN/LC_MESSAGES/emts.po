@@ -203,7 +203,7 @@ msgid "Mail System License Remain Day %d\n"
 msgstr "邮件系统商业授权剩余使用天数 %d\n"
 
 msgid "LicenseType: %s, RemainUser: %d(%0.2f%s), RemainDay: %d\n"
-msgstr "邮件系统商业授权: %s, 剩余用户数%d(%0.2f%s), 剩余使用%d天\n"
+msgstr "%s, 剩余用户数%d(%0.2f%s), 剩余使用%d天\n"
 
 msgid "--- Found eYou Product: Mail System Installed, Version: %s\n"
 msgstr "--- 发现本机安装了eYou邮件系统, 版本[%s]\n"

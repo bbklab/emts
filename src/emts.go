@@ -200,6 +200,7 @@ func process(sinfo *sjson.Json, config *inc.Config) {
 	}
 
 	checkSudoTTY()
+	checkCfgFile()
 
 	// get eyou mail startups
 	arrMailStartups, err := sinfo.Get("epinfo").Get("mail").Get("startups").StringArray()
@@ -670,6 +671,9 @@ func checkSudoTTY() {
 	}
 }
 
+func checkCfgFile() {
+}
+
 func checkMailSvr(ss map[string]interface{}) {
 	for svr, addr := range ss {
 		switch addrs := addr.(type) {
@@ -1090,7 +1094,7 @@ func checkMailMCacheSvr(s map[string]interface{}) {
 		fmt.Printf(_crit(trans("%d/%d Memcache Svr Fail\n%s\n")),
 			warn, len(args), rest)
 	} else {
-		if len(rest) > 0 { // if indeed have result
+		if len(result) > 0 { // if indeed have result
 			fmt.Printf(_succ(trans("%d Memcache Svr OK\n")),
 				len(args))
 		}
@@ -1124,7 +1128,7 @@ func checkMailMysqlRepl() {
 		fmt.Printf(_crit(trans("%d Mysql Replication Fail\n%s\n")),
 			warn, rest)
 	} else {
-		if len(rest) > 0 { // if indeed have result
+		if len(result) > 0 { // if indeed have result
 			fmt.Printf(_succ(trans("%d Mysql Replication\n")),
 				len(args)-1)
 		}
