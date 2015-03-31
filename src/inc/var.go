@@ -23,5 +23,6 @@ func init() {
 		"mysqlrepl": CheckerDirPath + "/mysqlrepl",
 		"tcpconn":   CheckerDirPath + "/tcpconn",
 		"iostat":    CheckerDirPath + "/iostat",
+		"memcache":  CheckerDirPath + "/memcache",
 	}
 }

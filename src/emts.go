@@ -185,20 +185,21 @@ func process(sinfo *sjson.Json, config *inc.Config) {
 	/*
 		begin eyou mail related check
 	*/
-
-	// first check if eyou mail installed or not ?
+	// check if eyou mail installed or not ?
 	if mailIsInstalled == 0 {
 		return
+		// goto GwCheck
 	}
+
+	emVersion := sinfo.Get("epinfo").Get("mail").Get("config").Get("emversion").MustString()
+	fmt.Printf(trans("--- Found eYou Product: Mail System Installed, Version: %s\n"),
+		emVersion)
 
 	if sysStartups, err := sinfo.Get("startups").StringArray(); err == nil {
 		checkMailStartups(sysStartups, []string{"eyou_mail"})
 	}
 
 	checkSudoTTY()
-
-	mailSvrAddr := sinfo.Get("epinfo").Get("mail").Get("config").Get("svraddr").MustMap()
-	checkMailSvr(mailSvrAddr)
 
 	// get eyou mail startups
 	arrMailStartups, err := sinfo.Get("epinfo").Get("mail").Get("startups").StringArray()
@@ -219,11 +220,14 @@ func process(sinfo *sjson.Json, config *inc.Config) {
 		strings.Contains(strMailStartups, "smtp") ||
 		strings.Contains(strMailStartups, "imap") {
 
+		mailLicense := sinfo.Get("epinfo").Get("mail").Get("license").MustMap()
+		checkMailLicense(mailLicense, config.MailLicense)
+
 		mailConfigs := sinfo.Get("epinfo").Get("mail").MustMap()
 		checkMailMproxySvr(mailConfigs)
 
-		mailLicense := sinfo.Get("epinfo").Get("mail").Get("license").MustMap()
-		checkMailLicense(mailLicense, config.MailLicense)
+		mailSvrAddr := sinfo.Get("epinfo").Get("mail").Get("config").Get("svraddr").MustMap()
+		checkMailSvr(mailSvrAddr)
 	}
 
 	// if mail startups contains remote or local
@@ -237,6 +241,26 @@ func process(sinfo *sjson.Json, config *inc.Config) {
 		strings.Contains(strMailStartups, "mysql_log") {
 		checkMailMysqlRepl() // don't check if is slave, as caller return nothing if not slave
 	}
+
+	/*
+	   GwCheck:
+
+	   	// check if eyou gw installed or not ?
+	   	if gwIsInstalled == 0 {
+	   		goto EpushCheck
+	   	}
+
+	   	return
+
+	   EpushCheck:
+
+	   	// check if eyou push installed or not ?
+	   	if epushIsInstalled == 0 {
+	   		return
+	   	}
+
+	   	return
+	*/
 }
 
 func checkSysStartups(c chan string, ss []string, must []string) {
@@ -671,10 +695,9 @@ func checkMtaSvr(svr string, addrs string) {
 }
 
 func checkMailPhpd(mailcfg map[string]interface{}, GMQueueLimit int64) {
+
 	mailcfg_tools := mailcfg["tools"]
-	mailcfg_config := mailcfg["config"]
 	var mailMysqlCLI, mailMysqlAdmin string
-	var mailUsrMysql, mailIdxMysql, mailLogMysql map[string]interface{}
 	switch tools := mailcfg_tools.(type) {
 	case map[string]interface{}:
 		switch v := tools["mysqlcli"].(type) {
@@ -686,6 +709,10 @@ func checkMailPhpd(mailcfg map[string]interface{}, GMQueueLimit int64) {
 			mailMysqlAdmin = v
 		}
 	}
+
+	mailcfg_config := mailcfg["config"]
+	var mailUsrMysql, mailIdxMysql, mailLogMysql map[string]interface{}
+	var mailMemcache map[string]interface{}
 	switch config := mailcfg_config.(type) {
 	case map[string]interface{}:
 		switch v := config["usrdb"].(type) {
@@ -700,9 +727,15 @@ func checkMailPhpd(mailcfg map[string]interface{}, GMQueueLimit int64) {
 		case map[string]interface{}:
 			mailLogMysql = v
 		}
+		switch v := config["memcache"].(type) {
+		case map[string]interface{}:
+			mailMemcache = v
+		}
 	}
+
 	checkMailDBSvr(mailMysqlAdmin, mailUsrMysql, mailIdxMysql, mailLogMysql)
 	checkMailGMSvr(mailMysqlCLI, mailUsrMysql, GMQueueLimit)
+	checkMailMCacheSvr(mailMemcache)
 }
 
 func checkMailDBSvr(mysqladmin string, userdb, idxdb, logdb map[string]interface{}) {
@@ -1025,6 +1058,45 @@ func checkMailGMSvr(mysqlcli string, userdb map[string]interface{}, limit int64)
 	}
 }
 
+func checkMailMCacheSvr(s map[string]interface{}) {
+	args := make([]string, 0)
+	for _, c := range []string{"memcache_session", "memcache_fix", "memcache_hot"} {
+		switch v := s[c].(type) {
+		case []interface{}:
+			for _, vv := range v {
+				switch vvv := vv.(type) {
+				case []interface{}:
+					temp := ""
+					for _, vi := range vvv {
+						switch vii := vi.(type) {
+						case string:
+							if len(temp) > 0 {
+								temp += "," + vii
+							} else {
+								temp += vii
+							}
+						}
+					}
+					if len(temp) > 0 {
+						args = append(args, temp)
+					}
+				}
+			}
+		}
+	}
+	result := inc.Caller(inc.Checker["memcache"], args)
+	warn, rest := parseCheckerOutput(result)
+	if warn > 0 {
+		fmt.Printf(_crit(trans("%d/%d Memcache Svr Fail\n%s\n")),
+			warn, len(args), rest)
+	} else {
+		if len(rest) > 0 { // if indeed have result
+			fmt.Printf(_succ(trans("%d Memcache Svr OK\n")),
+				len(args))
+		}
+	}
+}
+
 func checkMailQueue(limit int64) {
 	result := inc.Caller(inc.Checker["emqueue"], []string{})
 	arr := strings.SplitN(result, " ", -1)
@@ -1074,23 +1146,25 @@ func parseCheckerOutput(s string) (int, string) {
 			}
 		}
 		sline := strings.TrimRight(string(line), "\n")
-		if len(sline) > 0 {
-			arrline := strings.SplitN(sline, " ", 3)
-			if len(arrline) >= 2 {
-				if arrline[1] == "warn" {
-					warn++
-					if len(arrline) >= 3 {
-						if len(result) > 0 {
-							result += "\n\t" + arrline[0] + " - " + arrline[2]
-						} else {
-							result += "\t" + arrline[0] + " - " + arrline[2]
-						}
-					}
-				}
-			}
-		} else {
+		if len(sline) <= 0 {
 			continue
 		}
+		arrline := strings.SplitN(sline, " ", 3)
+		if len(arrline) < 2 {
+			continue
+		}
+		if arrline[1] != "warn" {
+			continue
+		}
+		warn++
+		if len(arrline) >= 3 {
+			if len(result) > 0 {
+				result += "\n\t" + arrline[0] + " - " + arrline[2]
+			} else {
+				result += "\t" + arrline[0] + " - " + arrline[2]
+			}
+		}
+		arrline = []string{}
 	}
 	return warn, result
 }
@@ -1138,7 +1212,7 @@ func printResultSummary(s map[string]int) {
 		score = 0
 	}
 	fmt.Printf("\n------\n")
-	fmt.Printf(trans("Result: %s:%s, %s:%s, %s:%s, %s:%s\nScore: %d\n"),
+	fmt.Printf(trans("Result: %s:%s, %s:%s, %s:%s, %s:%s\nScore: %d\n\n\n"),
 		trans("SUCC"), _green(strconv.Itoa(s["Succ"])),
 		trans("NOTE"), _yellow(strconv.Itoa(s["Note"])),
 		trans("WARN"), _red(strconv.Itoa(s["Warn"])),

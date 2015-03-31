@@ -205,5 +205,14 @@ msgstr "邮件系统商业授权剩余使用天数 %d\n"
 msgid "LicenseType: %s, RemainUser: %d(%0.2f%s), RemainDay: %d\n"
 msgstr "邮件系统商业授权: %s, 剩余用户数%d(%0.2f%s), 剩余使用%d天\n"
 
-msgid "Result: %s:%s, %s:%s, %s:%s, %s:%s\nScore: %d\n"
-msgstr "结果: %s:%s, %s:%s, %s:%s, %s:%s\n得分: %d\n"
+msgid "--- Found eYou Product: Mail System Installed, Version: %s\n"
+msgstr "--- 发现本机安装了eYou邮件系统, 版本[%s]\n"
+
+msgid "%d/%d Memcache Svr Fail\n%s\n"
+msgstr "%d/%d 个Memcache服务异常\n%s\n"
+
+msgid "%d Memcache Svr OK\n"
+msgstr "%d 个Memcache服务正常\n"
+
+msgid "Result: %s:%s, %s:%s, %s:%s, %s:%s\nScore: %d\n\n\n"
+msgstr "结果: %s:%s, %s:%s, %s:%s, %s:%s\n得分: %d\n\n\n"
