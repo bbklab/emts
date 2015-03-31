@@ -1,0 +1,112 @@
+#!/usr/bin/env perl
+
+BEGIN {
+  my @incs = ();    # set additional path
+  push @INC, @incs;
+};
+
+use strict;
+use warnings;
+use utf8;
+use IO::Socket;
+use IO::Socket::INET;
+binmode(STDIN, ":encoding(utf8)");
+binmode(STDOUT, ":encoding(utf8)");
+binmode(STDERR, ":encoding(utf8)");
+binmode STDOUT, ':raw';
+
+$SIG{'PIPE'} = 'IGNORE';
+
+$| = 1;
+
+sub show_help {
+print <<EOF
+Arguments:    {memcache_addr}
+Usage:   127.0.0.1,11211  127.0.0.1,11231  127.0.0.1,11251
+
+Output:   
+{memcache_addr} succ
+{memcache_addr} warn errstuff
+
+Example:
+EOF
+;
+exit (0);
+}
+
+unless (scalar @ARGV) {
+  exit (0);
+}
+
+if ($ARGV[0] eq 'h') {
+  show_help;
+}
+
+our $time_out = 5;
+
+while(@ARGV) {
+  my ($mem_host, $mem_port) = (split /,/, shift @ARGV)[0,1];
+  if (!defined $mem_host || !defined $mem_port) {
+	next;
+  }
+  if ($mem_port =~ /\D/) {
+	next;
+  }
+
+  my $memcache = IO::Socket::INET->new(
+	PeerAddr =>	$mem_host,
+	PeerPort => 	$mem_port,
+	Proto	 =>	'tcp',
+	Timeout =>	$time_out,
+  );
+  my $address = $mem_host . ':' . $mem_port;
+  unless (defined $memcache) {
+	if ($@) {
+		$@ =~ s/[\r\n]//g;
+		printf("%s warn %s\n", $address, $@);
+	} else {
+		printf("%s warn connect error\n", $address);
+	}
+	next;
+  } 
+
+  # run all process in a eval{} with alarm(5)
+  eval {
+	local $SIG{'ALRM'} = sub { die 'Running Timed Out'; };
+	alarm(5);
+
+  	print $memcache "stats\r\n";	## if without \r, will hang up for 30s.
+	my $iserror = 0;
+  	while (<$memcache>) {
+		chomp;
+		last if /END/;
+		if (m/ERROR/) {
+			$iserror = 1;
+			last;
+		} 
+	}
+	if ($iserror) {
+		printf("%s warn ERROR\n", $address);
+		goto BREAK;
+	} 
+	
+	alarm(0);
+  };
+  alarm(0);
+
+  if ($@) {
+        $@ =~ s/[\r\n]//g;
+        if ($@ =~ m/Running Timed Out/) {
+                printf ("%s warn timeout\n", $address);
+        } else {
+                printf ("%s warn %s\n", $address, $@);
+        }
+  } else {
+        printf ("%s succ\n", $address );
+  }
+
+  BREAK:{
+	$memcache->close() if ($memcache);
+	next;
+  }
+}
