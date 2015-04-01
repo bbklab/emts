@@ -151,13 +151,11 @@ func process(sinfo *sjson.Json, config *inc.Config) {
 	go checkDiskFsio(c, diskFsio)
 	n++
 
-	/*
-		isTimeout := make(chan bool, 1)
-		go func() {
-			time.Sleep(30 * time.Second)
-			isTimeout <- true
-		}()
-	*/
+	isTimeout := make(chan bool, 1)
+	go func() {
+		time.Sleep(30 * time.Second)
+		isTimeout <- true
+	}()
 
 	i := 0
 	for {
@@ -169,11 +167,6 @@ func process(sinfo *sjson.Json, config *inc.Config) {
 		if i >= n { // all job finished
 			break
 		}
-		/*
-			case <-isTimeout:
-				fmt.Println("JobTimOut")
-				break
-		*/
 	}
 
 	/* Following using inc.Caller to run other command
@@ -255,6 +248,7 @@ func process(sinfo *sjson.Json, config *inc.Config) {
 
 	   	return
 	*/
+
 }
 
 func checkSysStartups(c chan string, ss []string, must []string) {
