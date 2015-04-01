@@ -1002,7 +1002,7 @@ func checkMailLicense(s map[string]interface{}, c *inc.MailLicense) {
 			remainSum)
 		return
 	}
-	if remainSum > 0 {
+	if allowSum > 0 {
 		remainRate = float64(100 * remainSum / allowSum)
 		if remainRate <= c.RemainRate {
 			fmt.Printf(_note(trans("Mail System License Remain Users Rate %0.2f%s\n")),
