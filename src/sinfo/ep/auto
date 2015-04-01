@@ -503,10 +503,17 @@ get_emcompinfo() {
 			if [ -n "${listen_addr}" ] && [ -n "${listen_port}" ]; then
 				bind_addr="${listen_addr}:${listen_port}"
 			fi
-			local gmysql_addr=$(read_conf "${EM_INIT_CONFIG}" "GEARMAN_MYSQL_HOST" "=")
-			local gmysql_port=$(read_conf "${EM_INIT_CONFIG}" "GEARMAN_MYSQL_PORT" "=")
-			if [ -n "${gmysql_addr}" ] && [ -n "${gmysql_port}" ]; then
-				conn_addr="${gmysql_addr}:${gmysql_port}"
+		elif [ "${comp}" == "gearman_mta"	]; then
+			local listen_addr=$(read_conf "${EM_INIT_CONFIG}" "GEARMAN_MTA_LISTEN" "=")
+			local listen_port=$(read_conf "${EM_INIT_CONFIG}" "GEARMAN_MTA_PORT" "=")
+			if [ -n "${listen_addr}" ] && [ -n "${listen_port}" ]; then
+				bind_addr="${listen_addr}:${listen_port}"
+			fi
+		elif [ "${comp}" == "gearman_php"	]; then
+			local listen_addr=$(read_conf "${EM_INIT_CONFIG}" "GEARMAN_PHP_LISTEN" "=")
+			local listen_port=$(read_conf "${EM_INIT_CONFIG}" "GEARMAN_PHP_PORT" "=")
+			if [ -n "${listen_addr}" ] && [ -n "${listen_port}" ]; then
+				bind_addr="${listen_addr}:${listen_port}"
 			fi
 		elif [ "${comp}" == "phpd"		]; then
 			:
@@ -872,7 +879,7 @@ get_memcache_svraddr() {
 }
 
 get_gearman_svraddr() {
-	comps=( gearman )
+	comps=( gearman gearman_mta gearman_php )
 	get_listen_addr ${comps[*]}
 }
 
