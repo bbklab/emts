@@ -479,6 +479,24 @@ get_emcompinfo() {
 			if [ -n "${listen_addr}" ] && [ -n "${listen_port}" ]; then
 				bind_addr="${listen_addr}:${listen_port}"
 			fi
+		elif [ "${comp}" == "memcache_config"	]; then
+			local listen_addr=$(read_conf "${EM_INIT_CONFIG}" "MEMCACHE_CONFIG_LISTEN" "=")
+			local listen_port=$(read_conf "${EM_INIT_CONFIG}" "MEMCACHE_CONFIG_PORT" "=")
+			if [ -n "${listen_addr}" ] && [ -n "${listen_port}" ]; then
+				bind_addr="${listen_addr}:${listen_port}"
+			fi
+		elif [ "${comp}" == "memcache_db"	]; then
+			local listen_addr=$(read_conf "${EM_INIT_CONFIG}" "MEMCACHE_DB_LISTEN" "=")
+			local listen_port=$(read_conf "${EM_INIT_CONFIG}" "MEMCACHE_DB_PORT" "=")
+			if [ -n "${listen_addr}" ] && [ -n "${listen_port}" ]; then
+				bind_addr="${listen_addr}:${listen_port}"
+			fi
+		elif [ "${comp}" == "memcache_fastdb"	]; then
+			local listen_addr=$(read_conf "${EM_INIT_CONFIG}" "MEMCACHE_FASTDB_LISTEN" "=")
+			local listen_port=$(read_conf "${EM_INIT_CONFIG}" "MEMCACHE_FASTDB_PORT" "=")
+			if [ -n "${listen_addr}" ] && [ -n "${listen_port}" ]; then
+				bind_addr="${listen_addr}:${listen_port}"
+			fi
 		elif [ "${comp}" == "gearman"		]; then
 			local listen_addr=$(read_conf "${EM_INIT_CONFIG}" "GEARMAN_LISTEN" "=")
 			local listen_port=$(read_conf "${EM_INIT_CONFIG}" "GEARMAN_PORT" "=")
