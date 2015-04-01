@@ -236,13 +236,6 @@ func process(sinfo *sjson.Json, config *inc.Config) {
 		checkMailQueue(config.QueueLimit)
 	}
 
-	// if mail startups contains mysql backedn
-	if strings.Contains(strMailStartups, "mysql") ||
-		strings.Contains(strMailStartups, "mysql_index") ||
-		strings.Contains(strMailStartups, "mysql_log") {
-		checkMailMysqlRepl() // don't check if is slave, as caller return nothing if not slave
-	}
-
 	/*
 	   GwCheck:
 
@@ -689,11 +682,11 @@ func checkMtaSvr(svr string, addrs string) {
 		result := inc.Caller(inc.Checker[svr], args)
 		warn, rest := parseCheckerOutput(result)
 		if warn > 0 {
-			fmt.Printf(_warn(trans("%d %s Mail Service Fail\n%s\n")),
-				warn, strings.ToUpper(svr), rest)
+			fmt.Printf(_warn(trans("%d/%d %s Mail Service Fail\n%s\n")),
+				warn, len(args), strings.ToUpper(svr), rest)
 		} else {
-			fmt.Printf(_succ(trans("%s Mail Service\n")),
-				strings.ToUpper(svr))
+			fmt.Printf(_succ(trans("%d %s Mail Service\n")),
+				len(args), strings.ToUpper(svr))
 		}
 	}
 }
@@ -1126,26 +1119,6 @@ func checkMailQueue(limit int64) {
 			} else {
 				fmt.Printf(_succ(trans("Mail Queue %d\n")), num)
 			}
-		}
-	}
-}
-
-func checkMailMysqlRepl() {
-	// use fix default settings here
-	args := []string{"/usr/local/eyou/mail/opt/mysql/bin/mysql",
-		"127.0.0.1,3306,eyou,eyou",
-		"127.0.0.1,3316,eyou,eyou",
-		"127.0.0.1,3326,eyou,eyou",
-	}
-	result := inc.Caller(inc.Checker["mysqlrepl"], args)
-	warn, rest := parseCheckerOutput(result)
-	if warn > 0 {
-		fmt.Printf(_crit(trans("%d Mysql Replication Fail\n%s\n")),
-			warn, rest)
-	} else {
-		if len(result) > 0 { // if indeed have result
-			fmt.Printf(_succ(trans("%d Mysql Replication\n")),
-				len(args)-1)
 		}
 	}
 }

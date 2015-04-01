@@ -184,12 +184,6 @@ msgstr "Gearman队列总数 %d\n"
 msgid "Mail Queue %d\n"
 msgstr "邮件投递队列总数 %d\n"
 
-msgid "%d Mysql Replication Fail\n%s\n"
-msgstr "%d 个Mysql复制异常\n%s\n"
-
-msgid "%d Mysql Replication\n"
-msgstr "%d 个Mysql复制正常\n"
-
 msgid "Mail System License is Over!\n"
 msgstr "邮件系统商业授权过期/无效!\n"
 
