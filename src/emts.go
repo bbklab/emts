@@ -192,7 +192,7 @@ func process(sinfo *sjson.Json, config *inc.Config) {
 	}
 
 	emVersion := sinfo.Get("epinfo").Get("mail").Get("config").Get("emversion").MustString()
-	fmt.Printf(trans("--- Found eYou Product: Mail System Installed, Version: %s\n"),
+	fmt.Printf(trans("----: Found eYou Product: Mail System Installed, Version: %s\n"),
 		emVersion)
 
 	if sysStartups, err := sinfo.Get("startups").StringArray(); err == nil {
@@ -971,6 +971,7 @@ func checkMailLicense(s map[string]interface{}, c *inc.MailLicense) {
 	}
 	switch v := s["user_num"].(type) {
 	case string:
+		v = strings.Replace(v, ",", "", -1)
 		if n, err := strconv.ParseInt(v, 10, 64); err == nil {
 			allowSum = n
 		}
@@ -979,6 +980,7 @@ func checkMailLicense(s map[string]interface{}, c *inc.MailLicense) {
 	default:
 		// fmt.Printf("default: remain_acct_num: %d\n", v) // detect it's real type
 		vv := fmt.Sprintf("%s", v) // convert json.Number -> str -> int
+		vv = strings.Replace(vv, ",", "", -1)
 		if vi, err := strconv.ParseInt(vv, 10, 64); err == nil {
 			remainSum = vi
 		}
@@ -992,9 +994,35 @@ func checkMailLicense(s map[string]interface{}, c *inc.MailLicense) {
 		licenseType = v
 	}
 
+	// collecting license data
+	details := fmt.Sprintf(trans("RemainUsers Sum %d/%d"),
+		remainSum, allowSum)
+	if allowSum > 0 {
+		remainRate = float64(100 * remainSum / allowSum)
+		details += fmt.Sprintf("(%0.2f%s), ",
+			remainRate, "%")
+	}
+	if t, err := time.Parse("2006/01/02", endDay); err == nil {
+		temp := t.Sub(time.Now())
+		remainDay = int64(temp.Seconds() / 3600 / 24)
+		details += fmt.Sprintf(trans("Remain Day %d"),
+			remainDay)
+	}
+
+	// check threadhold
 	if isOver {
-		fmt.Printf(_crit(trans("Mail System License is Over! [%s]\n")),
-			licenseType)
+		fmt.Printf(_crit(trans("Mail System License is Over!\n")))
+		fmt.Printf("\t%s, %s\n", licenseType, details)
+		return
+	}
+	if remainDay <= c.RemainDay {
+		fmt.Printf(_warn(trans("Mail System License Remain Day %d\n")),
+			remainDay)
+		return
+	}
+	if remainRate <= c.RemainRate {
+		fmt.Printf(_note(trans("Mail System License Remain Users Rate %0.2f%s\n")),
+			remainRate, "%")
 		return
 	}
 	if remainSum <= c.RemainSum {
@@ -1002,26 +1030,9 @@ func checkMailLicense(s map[string]interface{}, c *inc.MailLicense) {
 			remainSum)
 		return
 	}
-	if allowSum > 0 {
-		remainRate = float64(100 * remainSum / allowSum)
-		if remainRate <= c.RemainRate {
-			fmt.Printf(_note(trans("Mail System License Remain Users Rate %0.2f%s\n")),
-				remainRate, "%")
-			return
-		}
-	}
-	if t, err := time.Parse("2006/01/02", endDay); err == nil {
-		temp := t.Sub(time.Now())
-		remainDay = int64(temp.Seconds() / 3600 / 24)
-		if remainDay <= c.RemainDay {
-			fmt.Printf(_warn(trans("Mail System License Remain Day %d\n")),
-				remainDay)
-			return
-		}
-	}
 
-	fmt.Printf(_succ(trans("LicenseType: %s, RemainUser: %d(%0.2f%s), RemainDay: %d\n")),
-		licenseType, remainSum, remainRate, "%", remainDay)
+	fmt.Printf(_succ(trans("LicenseType: %s, RemainUser: %d/%d(%0.2f%s), RemainDay: %d\n")),
+		licenseType, remainSum, allowSum, remainRate, "%", remainDay)
 }
 
 func checkMailGMSvr(mysqlcli string, userdb map[string]interface{}, limit int64) {
