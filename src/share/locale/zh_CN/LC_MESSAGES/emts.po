@@ -199,6 +199,15 @@ msgstr "剩余用户数 %d/%d"
 msgid "Remain Day %d"
 msgstr "剩余使用天数 %d"
 
+msgid "Mail System License Remain Day %d\n"
+msgstr "邮件系统商业授权剩余使用天数 %d\n"
+
+msgid "Mail System License Remain Users Rate %0.2f%s\n"
+msgstr "邮件系统商业授权剩余用户比例 %0.2f%s\n"
+
+msgid "Mail System License Remain Users Sum %d/%d\n"
+msgstr "邮件系统商业授权剩余用户数 %d/%d\n"
+
 msgid "LicenseType: %s, RemainUser: %d/%d(%0.2f%s), RemainDay: %d\n"
 msgstr "%s, 剩余用户数%d/%d(%0.2f%s), 剩余使用%d天\n"
 

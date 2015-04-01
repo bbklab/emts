@@ -191,7 +191,7 @@ func process(sinfo *sjson.Json, config *inc.Config) {
 		// goto GwCheck
 	}
 
-	emVersion := sinfo.Get("epinfo").Get("mail").Get("config").Get("emversion").MustString()
+	emVersion := sinfo.Get("epinfo").Get("mail").Get("emversion").MustString()
 	fmt.Printf(trans("----: Found eYou Product: Mail System Installed, Version: %s\n"),
 		emVersion)
 
@@ -227,7 +227,7 @@ func process(sinfo *sjson.Json, config *inc.Config) {
 		mailConfigs := sinfo.Get("epinfo").Get("mail").MustMap()
 		checkMailMproxySvr(mailConfigs)
 
-		mailSvrAddr := sinfo.Get("epinfo").Get("mail").Get("config").Get("svraddr").MustMap()
+		mailSvrAddr := sinfo.Get("epinfo").Get("mail").Get("svraddr").MustMap()
 		checkMailSvr(mailSvrAddr)
 	}
 
@@ -1020,14 +1020,14 @@ func checkMailLicense(s map[string]interface{}, c *inc.MailLicense) {
 			remainDay)
 		return
 	}
+	if remainSum <= c.RemainSum {
+		fmt.Printf(_note(trans("Mail System License Remain Users Sum %d/%d\n")),
+			remainSum, allowSum)
+		return
+	}
 	if remainRate <= c.RemainRate {
 		fmt.Printf(_note(trans("Mail System License Remain Users Rate %0.2f%s\n")),
 			remainRate, "%")
-		return
-	}
-	if remainSum <= c.RemainSum {
-		fmt.Printf(_note(trans("Mail System License Remain Users Sum %d\n")),
-			remainSum)
 		return
 	}
 

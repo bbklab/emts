@@ -233,20 +233,18 @@ if (EYOUMAIL_REALCFG_JSON ne '') {
 		close $fh if $fh;
         	eval { $mail_config = JSON->new->allow_nonref->utf8(1)->ascii(1)->decode($mail_config_json); };
         	unless ($@) {
-                	%mail_config = &fill_mail_config($mail_config)
+                	%mail_config = &filter_mail_config($mail_config)
         	}
 	}
 }
 
-sub fill_mail_config {
+sub filter_mail_config {
 	my $full_configs = $_[0];
 	my %full_configs = %{$full_configs};
 
-	# 0. init result configs
 	my %result_configs = ();
 
-	# 1. fill with wanted configs
-	my %wanted_filed = (
+	my %filter_filed = (
 		# common configs
 		'common'	=> [ qw( 
 					server_me  session_lifetime password_encode_algo timezone login_ssl
@@ -278,89 +276,94 @@ sub fill_mail_config {
 					)
 				   ],
 	);
-	foreach my $a (keys %wanted_filed) {
-		foreach my $b (@{$wanted_filed{$a}}) {
+	foreach my $a (keys %filter_filed) {
+		foreach my $b (@{$filter_filed{$a}}) {
 			$result_configs{$a}{$b} = $full_configs{$b};
 		}
 	}
-	
-	# 2. fill with other compent configs
-	my $fh;
 
-	open $fh, "$emauto emversion 2>&- |";
+	return %result_configs
+}
+
+# get mail emversion
+my $emversion = undef;
+if (-f $emauto && -x $emauto) {
+	open my $fh, "$emauto emversion 2>&- |";
 	if ($fh) {
 		while (<$fh>) {
-			chomp; $result_configs{'emversion'} = $_;
+			chomp; $emversion = $_;
 			last;
 		}
 	}
+}
 
-	my %comp = ();
-
+# get mail svr address
+my %svraddr = ();
+if (-f $emauto && -x $emauto) {
+	my $fh;
 	open $fh, "$emauto httpaddr 2>&- |";
 	if ($fh) {
 		while (<$fh>) {
-			chomp; $comp{'http'} = $_;
+			chomp; $svraddr{'http'} = $_;
 			last;
 		}
 	}
-
+	
 	open $fh, "$emauto popaddr 2>&- |";
 	if ($fh) {
 		while (<$fh>) {
-			chomp; $comp{'pop'} = $_;
+			chomp; $svraddr{'pop'} = $_;
 			last;
 		}
 	}
-
+	
 	open $fh, "$emauto smtpaddr 2>&- |";
 	if ($fh) {
 		while (<$fh>) {
-			chomp; $comp{'smtp'} = $_;
+			chomp; $svraddr{'smtp'} = $_;
 			last;
 		}
 	}
-
+	
 	open $fh, "$emauto imapaddr 2>&- |";
 	if ($fh) {
 		while (<$fh>) {
-			chomp; $comp{'imap'} = $_;
+			chomp; $svraddr{'imap'} = $_;
 			last;
 		}
 	}
-
+	
 	open $fh, "$emauto mysqladdr 2>&- |";
 	if ($fh) {
 		while (<$fh>) {
-			chomp; $comp{'mysql'} = $_;
+			chomp; $svraddr{'mysql'} = $_;
 			last;
 		}
 	}
 	open $fh, "$emauto memcacheaddr 2>&- |";
 	if ($fh) {
 		while (<$fh>) {
-			chomp; $comp{'memcache'} = $_;
+			chomp; $svraddr{'memcache'} = $_;
 			last;
 		}
 	}
 	open $fh, "$emauto mproxyaddr 2>&- |";
 	if ($fh) {
 		while (<$fh>) {
-			chomp; $comp{'mproxy'} = $_;
+			chomp; $svraddr{'mproxy'} = $_;
 			last;
 		}
 	}
 	open $fh, "$emauto gearmanaddr 2>&- |";
 	if ($fh) {
 		while (<$fh>) {
-			chomp; $comp{'gearman'} = $_;
+			chomp; $svraddr{'gearman'} = $_;
 			last;
 		}
 	}
-
-	$result_configs{'svraddr'} = \%comp;
-	return %result_configs
 }
+### %svraddr
+
 
 # get gw version
 my $gw_version = undef;
@@ -508,6 +511,8 @@ if (-f $mail4_scriptd) {
 	'startups'		=> \@mail_startups,
 	'tools'			=> \%mail_tools,
 	'config'		=> \%mail_config,
+	'emversion'		=> $emversion,
+	'svraddr'		=> \%svraddr,
 );
 
 %gw = (
