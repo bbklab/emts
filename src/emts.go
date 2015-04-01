@@ -957,6 +957,8 @@ func checkMailLicense(s map[string]interface{}, c *inc.MailLicense) {
 	var licenseType string
 
 	switch v := s["is_over"].(type) { // type is: json.Number
+	case nil: // old format mail license
+		return
 	default:
 		// fmt.Printf("is_over: %d\n", v) // try to know it's real type
 		vv := fmt.Sprintf("%s", v) // convert json.Number -> str -> int

@@ -163,8 +163,8 @@ msgstr "sudo Requiretty 选项已关闭\n"
 msgid "%d %s Mail Service Fail\n%s\n"
 msgstr "%d 个 %s 邮件服务组件异常\n%s\n"
 
-msgid "%s Mail Service\n"
-msgstr "%s 邮件服务组件正常\n"
+msgid "%d %s Mail Service\n"
+msgstr "%d 个 %s 邮件服务组件正常\n"
 
 msgid "%d/%d Mysql Backend Connection Fail\n%s\n"
 msgstr "%d/%d 个Mysql后端服务连接失败\n%s\n"
