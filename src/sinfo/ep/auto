@@ -42,6 +42,10 @@ EMG_INSTALL="/var/emdg"
 EMG_OPT_INSTALL="/opt"
 EMG_CONFDIR="$EMG_INSTALL/etc"
 
+# OLD DIR DEF
+EM_OLD_OPTCONF="$EM_OPT_INSTALL/conf"
+
+
 # EM FILE DEF
 EM_CONFIG="$EM_CONFDIR/eyou_mail.ini"
 EM_INIT_CONFIG="$EM_CONFDIR/em_init_config"
@@ -516,6 +520,14 @@ get_emcompinfo() {
 						(NF=="4" && $1~/[0-9]+/){printf "%s:%d ",$2,$3}' \
 						"${EM_FILEDAGENT_CONFIG}" 2>&- )
 			fi
+		elif [ "${comp}" == "httpd_web"         ]; then
+			local file="${EM_OLD_OPTCONF}/httpd.conf"
+			if [ -n "${file}" ] && [ -f "${file}" ] && [ -s "${file}" ]; then
+				bind_addr=$( awk '($0~/^[ \t]*#/){next;} \
+						(NF=="2" && $1=="Listen" && $2~/:/){printf "%s ",$2;next;} \
+						(NF=="2" && $1=="Listen" && $2!~/:/){printf "0.0.0.0:%s ",$2;next;}' \
+						"${file}" 2>&- )
+			fi
 		elif [ "${comp}" == "httpd"		]; then
 			local file1="${EM_CONFDIR_APACHE}/httpd.conf"
 			local file2="${EM_OPT_INSTALL}/conf/httpd.conf"
@@ -714,6 +726,7 @@ get_pop_svraddr() {
 get_http_svraddr() {
 	local cfg_value1=
 	local comps=( 
+		"httpd_web"
 		"httpd" 
 		"nginx"
 	)

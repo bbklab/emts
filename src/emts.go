@@ -826,8 +826,10 @@ func checkMailDBSvr(mysqladmin string, userdb, idxdb, logdb map[string]interface
 		fmt.Printf(_crit(trans("%d/%d Mysql Backend Connection Fail\n%s\n")),
 			warn, len(args)-1, rest)
 	} else {
-		fmt.Printf(_succ(trans("%d Mysql Backend Connection\n")),
-			len(args)-1)
+		if len(result) > 0 { // if indeed have result
+			fmt.Printf(_succ(trans("%d Mysql Backend Connection\n")),
+				len(args)-1)
+		}
 	}
 }
 
@@ -927,8 +929,10 @@ func checkMproxySvr(mysqladmin string, puserdb, pidxdb map[string]interface{}) {
 		fmt.Printf(_crit(trans("%d/%d Mysql Proxy Backend Connection Fail\n%s\n")),
 			warn, len(args)-1, rest)
 	} else {
-		fmt.Printf(_succ(trans("%d Mysql Proxy Backend Connection\n")),
-			len(args)-1)
+		if len(result) > 0 { // if indeed have result
+			fmt.Printf(_succ(trans("%d Mysql Proxy Backend Connection\n")),
+				len(args)-1)
+		}
 	}
 }
 

@@ -176,7 +176,7 @@ msgid "%d/%d Mysql Proxy Backend Connection Fail\n%s\n"
 msgstr "%d/%d 个Mysql代理后端服务连接失败\n%s\n"
 
 msgid "%d Mysql Proxy Backend Connection\n"
-msgstr "%d 个Mysqld代理后端服务连接正常\n"
+msgstr "%d 个Mysql代理后端服务连接正常\n"
 
 msgid "Gearman Backend Queue %d\n"
 msgstr "Gearman队列总数 %d\n"
