@@ -19,9 +19,10 @@ import (
 
 var LevelMap map[string]int = map[string]int{
 	"Succ": 0,
-	"Note": 0,
-	"Warn": 0,
-	"Crit": 0,
+	"Atte": 0, // score: -2
+	"Note": 0, // score: -5
+	"Warn": 0, // score: -20
+	"Crit": 0, // score: -40
 }
 
 func init() {
@@ -399,7 +400,7 @@ func checkRuntime(c chan string, s string, limit int) {
 func checkIdlerate(c chan string, s string, limit float64) {
 	if rate, err := strconv.ParseFloat(strings.TrimRight(s, "%"), 64); err == nil {
 		if rate <= limit {
-			c <- _note(fmt.Sprintf(trans("System is Busy, Avg Idle Rate %0.2f%s"),
+			c <- _atte(fmt.Sprintf(trans("System is Busy, Avg Idle Rate %0.2f%s"),
 				rate, "%"))
 		} else {
 			c <- _succ(fmt.Sprintf(trans("System is Idle, Avg Idle Rate %0.2f%s"),
@@ -1169,6 +1170,10 @@ func _succ(s string) string {
 	LevelMap["Succ"]++
 	return trans("SUCC: ") + s
 }
+func _atte(s string) string {
+	LevelMap["Atte"]++
+	return _lightgray(trans("ATTE: ") + s)
+}
 func _note(s string) string {
 	LevelMap["Note"]++
 	return _yellow(trans("NOTE: ") + s)
@@ -1180,6 +1185,9 @@ func _warn(s string) string {
 func _crit(s string) string {
 	LevelMap["Crit"]++
 	return _purple(trans("CRIT: ") + s)
+}
+func _lightgray(s string) string {
+	return "\033[1;36m" + s + "\033[0m"
 }
 func _yellow(s string) string {
 	return "\033[1;33m" + s + "\033[0m"
@@ -1195,13 +1203,14 @@ func _green(s string) string {
 }
 
 func printResultSummary(s map[string]int) {
-	score := 100 - 40*s["Crit"] - 20*s["Warn"] - 5*s["Note"]
+	score := 100 - 40*s["Crit"] - 20*s["Warn"] - 5*s["Note"] - 2*s["Atte"]
 	if score < 0 {
 		score = 0
 	}
 	fmt.Printf("\n------\n")
-	fmt.Printf(trans("Result: %s:%s, %s:%s, %s:%s, %s:%s\nScore: %d\n\n\n"),
+	fmt.Printf(trans("Result: %s:%s, %s:%s, %s:%s, %s:%s, %s:%s\nScore: %d\n\n\n"),
 		trans("SUCC"), _green(strconv.Itoa(s["Succ"])),
+		trans("ATTE"), _lightgray(strconv.Itoa(s["Atte"])),
 		trans("NOTE"), _yellow(strconv.Itoa(s["Note"])),
 		trans("WARN"), _red(strconv.Itoa(s["Warn"])),
 		trans("CRIT"), _purple(strconv.Itoa(s["Crit"])),

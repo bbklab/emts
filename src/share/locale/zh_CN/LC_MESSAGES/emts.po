@@ -43,6 +43,9 @@ msgstr "解析系统信息失败!"
 msgid "SUCC: "
 msgstr "正常: "
 
+msgid "ATTE: "
+msgstr "提醒: "
+
 msgid "WARN: "
 msgstr "警告: "
 
@@ -54,6 +57,9 @@ msgstr "严重: "
 
 msgid "SUCC"
 msgstr "正常"
+
+msgid "ATTE"
+msgstr "提醒"
 
 msgid "WARN"
 msgstr "警告"
@@ -214,5 +220,5 @@ msgstr "%d/%d 个Memcache服务异常\n%s\n"
 msgid "%d Memcache Svr OK\n"
 msgstr "%d 个Memcache服务正常\n"
 
-msgid "Result: %s:%s, %s:%s, %s:%s, %s:%s\nScore: %d\n\n\n"
-msgstr "结果: %s:%s, %s:%s, %s:%s, %s:%s\n得分: %d\n\n\n"
+msgid "Result: %s:%s, %s:%s, %s:%s, %s:%s, %s:%s\nScore: %d\n\n\n"
+msgstr "结果: %s:%s, %s:%s, %s:%s, %s:%s, %s:%s\n得分: %d\n\n\n"
