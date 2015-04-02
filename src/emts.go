@@ -268,7 +268,7 @@ func checkSysStartups(c chan string, ss []string, must []string) {
 	}
 	n := len(lost)
 	if n > 0 {
-		c <- _warn(fmt.Sprintf(trans("Lost %d System Startups: %v"),
+		c <- _note(fmt.Sprintf(trans("Lost %d System Startups: %v"),
 			n, lost))
 	} else {
 		c <- _succ(fmt.Sprintf(trans("%d System Startups Ready"),
@@ -279,7 +279,7 @@ func checkSysStartups(c chan string, ss []string, must []string) {
 func checkSuperUser(c chan string, ss []interface{}, limit int) {
 	n := len(ss)
 	if n > limit {
-		c <- _warn(fmt.Sprintf(trans("%d System Super Privileged Users"),
+		c <- _note(fmt.Sprintf(trans("%d System Super Privileged Users"),
 			n))
 	} else {
 		c <- _succ(fmt.Sprintf(trans("%d System Super User"),
@@ -378,7 +378,7 @@ func checkUdpLostRate(c chan string, ss map[string]interface{}, limit float64) {
 
 func checkProcessNum(c chan string, s int, limit int) {
 	if s >= limit {
-		c <- _warn(fmt.Sprintf(trans("Running Process Sum %d"), s))
+		c <- _note(fmt.Sprintf(trans("Running Process Sum %d"), s))
 	} else {
 		c <- _succ(fmt.Sprintf(trans("Running Process Sum %d"), s))
 	}
@@ -388,7 +388,7 @@ func checkRuntime(c chan string, s string, limit int) {
 	if rtime, err := strconv.ParseFloat(s, 64); err == nil {
 		d := int(rtime / float64(3600*24))
 		if d <= limit {
-			c <- _note(fmt.Sprintf(trans("OS Restart Recently ?")))
+			c <- _atte(fmt.Sprintf(trans("OS Restart Recently ?")))
 		} else {
 			c <- _succ(fmt.Sprintf(trans("OS has been Running for %d days"), d))
 		}
@@ -414,7 +414,7 @@ func checkIdlerate(c chan string, s string, limit float64) {
 func checkLoadnow(c chan string, s string, limit float64) {
 	if load, err := strconv.ParseFloat(s, 64); err == nil {
 		if load >= limit {
-			c <- _warn(fmt.Sprintf(trans("System Load Avg %0.2f"), load))
+			c <- _note(fmt.Sprintf(trans("System Load Avg %0.2f"), load))
 		} else {
 			c <- _succ(fmt.Sprintf(trans("System Load Avg %0.2f"), load))
 		}
@@ -454,7 +454,7 @@ func checkMemUsage(c chan string, ss map[string]interface{}, limit float64) {
 
 	memusage = float64(memused * 100 / memtotal)
 	if memusage >= limit {
-		c <- _warn(fmt.Sprintf(trans("Memory Usage %0.2f%s"),
+		c <- _note(fmt.Sprintf(trans("Memory Usage %0.2f%s"),
 			memusage, "%"))
 	} else {
 		c <- _succ(fmt.Sprintf(trans("Memory Usage %0.2f%s"),
@@ -472,7 +472,7 @@ func checkCpuUsage(c chan string, ss map[string]interface{}, limit float64) {
 		if id, err := strconv.ParseFloat(value, 64); err == nil {
 			usage := float64(100 - id)
 			if usage >= limit {
-				c <- _warn(fmt.Sprintf(trans("CPU Usage %0.2f%s"),
+				c <- _note(fmt.Sprintf(trans("CPU Usage %0.2f%s"),
 					usage, "%"))
 			} else {
 				c <- _succ(fmt.Sprintf(trans("CPU Usage %0.2f%s"),
@@ -541,7 +541,7 @@ func checkDiskUsage(c chan string, ss []interface{}, limit *inc.DiskUsage) {
 	}
 
 	if warn > 0 {
-		c <- _warn(fmt.Sprintf(trans("Local Disk Space/Inode Usage"))) + result
+		c <- _note(fmt.Sprintf(trans("Local Disk Space/Inode Usage"))) + result
 	} else {
 		c <- _succ(fmt.Sprintf(trans("Local Disk Space/Inode Usage")))
 	}
