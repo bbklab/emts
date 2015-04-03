@@ -4,7 +4,11 @@
   "SuperUserNum":   1,
   "SeqRetransRate": 10.00,
   "UdpLostRate":    10.00,
-  "ProcessSum":     1000,
+  "SysProcess":     {
+    "TotalSum":   1000,	
+    "StateD":     5,
+    "StateZ":     5
+  },
   "RecentRestart":  1,
   "IdleRate":       5.00,
   "Load":           10.00,

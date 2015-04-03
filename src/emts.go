@@ -1,8 +1,8 @@
 package main
 
 import (
-	// "encoding/json"
 	"bufio"
+	"encoding/json"
 	"flag"
 	"fmt"
 	sjson "github.com/bitly/go-simplejson"
@@ -121,7 +121,11 @@ func process(sinfo *sjson.Json, config *inc.Config) {
 	n++
 
 	processSum := sinfo.Get("process").Get("totalnum").MustInt()
-	go checkProcessNum(c, processSum, config.ProcessSum)
+	go checkProcessNum(c, processSum, config.SysProcess.TotalSum)
+	n++
+
+	processStat := sinfo.Get("process").Get("state").MustMap()
+	go checkProcessStat(c, processStat, config.SysProcess.StateD, config.SysProcess.StateZ)
 	n++
 
 	runTime := sinfo.Get("systime").Get("runtime").MustString()
@@ -381,6 +385,46 @@ func checkProcessNum(c chan string, s int, limit int) {
 		c <- _note(fmt.Sprintf(trans("Running Process Sum %d"), s))
 	} else {
 		c <- _succ(fmt.Sprintf(trans("Running Process Sum %d"), s))
+	}
+}
+
+func checkProcessStat(c chan string, s map[string]interface{}, dlimit, zlimit int) {
+	warn := 0
+	result := ""
+	switch v := s["D"].(type) { // json.Number
+	case json.Number:
+		vv := fmt.Sprintf("%s", v)
+		if vi, err := strconv.Atoi(vv); err == nil {
+			if vi >= dlimit {
+				warn++
+			}
+			result += fmt.Sprintf(trans("Stat D Process: %d"), vi)
+		}
+	case nil:
+		result += fmt.Sprintf(trans("Stat D Process: %d"), 0)
+	}
+	switch v := s["Z"].(type) { // json.Number
+	case json.Number:
+		vv := fmt.Sprintf("%s", v)
+		if vi, err := strconv.Atoi(vv); err == nil {
+			if vi >= zlimit {
+				warn++
+			}
+			if len(result) > 0 {
+				result += ", "
+			}
+			result += fmt.Sprintf(trans("Stat Z Process: %d"), vi)
+		}
+	case nil:
+		if len(result) > 0 {
+			result += ", "
+		}
+		result += fmt.Sprintf(trans("Stat Z Process: %d"), 0)
+	}
+	if warn > 0 {
+		c <- _warn(result)
+	} else {
+		c <- _succ(result)
 	}
 }
 

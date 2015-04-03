@@ -12,7 +12,7 @@ type Config struct {
 	SuperUserNum   int
 	SeqRetransRate float64
 	UdpLostRate    float64
-	ProcessSum     int
+	SysProcess     *SysProcess
 	RecentRestart  int
 	IdleRate       float64
 	Load           float64
@@ -23,6 +23,12 @@ type Config struct {
 	GMQueueLimit   int64
 	QueueLimit     int64
 	MailLicense    *MailLicense
+}
+
+type SysProcess struct {
+	TotalSum int
+	StateD   int
+	StateZ   int
 }
 
 type DiskUsage struct {

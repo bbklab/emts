@@ -115,6 +115,12 @@ msgstr "UDP丢包率 %0.2f%s"
 msgid "Running Process Sum %d"
 msgstr "系统进程数 %d"
 
+msgid "Stat D Process: %d"
+msgstr "阻塞进程(D): %d"
+
+msgid "Stat Z Process: %d"
+msgstr "僵死进程(Z): %d"
+
 msgid "OS Restart Recently ?"
 msgstr "系统最近重启过 ?"
 
