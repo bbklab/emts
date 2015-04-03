@@ -448,7 +448,7 @@ func checkCmdVerify(c chan string, s map[string]interface{}) {
 		}
 	}
 	if warn > 0 {
-		c <- _warn(fmt.Sprintf(trans("%d Cmds Verified Failed\n%s"), warn, result))
+		c <- _crit(fmt.Sprintf(trans("%d Cmds Verified Failed\n%s"), warn, result))
 	} else {
 		switch v := s["passed"].(type) {
 		case []interface{}:
