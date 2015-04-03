@@ -725,8 +725,15 @@ func checkMailStartups(ss []string, must []string) {
 	}
 	n := len(lost)
 	if n > 0 {
-		fmt.Printf(_warn(trans("Lost %d eYou Product as System Startups: %v\n")),
-			n, lost)
+		reg := regexp.MustCompilePOSIX("eyou_mail[ \t]*start[ \t]*$")
+		file := "/etc/rc.local"
+		if inc.FGrepBool(file, reg) {
+			fmt.Printf(_succ(trans("%d eYou Product as System Startups Ready\n")),
+				1)
+		} else {
+			fmt.Printf(_warn(trans("Lost %d eYou Product as System Startups: %v\n")),
+				1, "eyou_mail")
+		}
 	} else {
 		fmt.Printf(_succ(trans("%d eYou Product as System Startups Ready\n")),
 			len(must))
@@ -734,13 +741,12 @@ func checkMailStartups(ss []string, must []string) {
 }
 
 func checkSudoTTY() {
-	if reg, err := regexp.Compile("^Defaults[ \t]*requiretty"); err == nil {
-		file := "/etc/sudoers"
-		if inc.FGrepBool(file, reg) {
-			fmt.Printf(_warn(trans("sudo Require TTY\n")))
-		} else {
-			fmt.Printf(_succ(trans("sudo Ignore TTY\n")))
-		}
+	reg := regexp.MustCompilePOSIX("^Defaults[ \t]*requiretty")
+	file := "/etc/sudoers"
+	if inc.FGrepBool(file, reg) {
+		fmt.Printf(_warn(trans("sudo Require TTY\n")))
+	} else {
+		fmt.Printf(_succ(trans("sudo Ignore TTY\n")))
 	}
 }
 
