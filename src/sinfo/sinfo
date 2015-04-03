@@ -33,6 +33,7 @@ our %data_config = (
   'mem_usage'		=> 1,
   'process'		=> 1,
   'netstat'		=> 1,
+  'cmdverify'		=> 1,
   'disk_space'		=> 1,
   'cpu_usage'		=> 1,
   'disk_fsio'		=> 1,
@@ -337,6 +338,42 @@ if ($data_config{'process'}) {
   $result{'process'} = \%process;
 }
 
+
+# cmdverify
+if ($data_config{'cmdverify'}) {
+  my %cmdverify = ();
+  my @changed = ();
+  my @passed = ();
+  my @cmds = qw(
+	/bin/ps /usr/sbin/ss /usr/sbin/lsof /bin/netstat /usr/bin/passwd
+  );
+  my $rpm = '/bin/rpm';
+  if (-f $rpm && -x $rpm) {
+	foreach my $cmd (@cmds) {
+		open my $fh, "$rpm -Vf $cmd 2>&- |";
+		if ($fh) {
+			my $ischanged = 0;
+			while(<$fh>){	 # if indeed output sth
+				chomp; s/\A\s*//; s/\s*\Z//;
+				my $flag = substr $_, 2, 1;
+				if ($flag eq 5) {
+					$ischanged = 1;
+				} 
+				last;   # process only one line
+			}
+			if ($ischanged) {
+				push @changed, $cmd;
+			} else {
+				push @passed, $cmd;
+			}
+		}
+	}
+  }
+  $cmdverify{'passed'} = \@passed;
+  $cmdverify{'changed'} = \@changed;
+  ### %cmdverify
+  $result{'cmdverify'} = \%cmdverify;
+}
 
 
 # netstat

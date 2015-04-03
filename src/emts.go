@@ -128,6 +128,10 @@ func process(sinfo *sjson.Json, config *inc.Config) {
 	go checkProcessStat(c, processStat, config.SysProcess.StateD, config.SysProcess.StateZ)
 	n++
 
+	cmdVerify := sinfo.Get("cmdverify").MustMap()
+	go checkCmdVerify(c, cmdVerify)
+	n++
+
 	runTime := sinfo.Get("systime").Get("runtime").MustString()
 	go checkRuntime(c, runTime, config.RecentRestart)
 	n++
@@ -425,6 +429,31 @@ func checkProcessStat(c chan string, s map[string]interface{}, dlimit, zlimit in
 		c <- _warn(result)
 	} else {
 		c <- _succ(result)
+	}
+}
+
+func checkCmdVerify(c chan string, s map[string]interface{}) {
+	warn := 0
+	result := ""
+	switch v := s["changed"].(type) {
+	case []interface{}:
+		if len(v) > 0 {
+			warn = len(v)
+		}
+		for _, vv := range v {
+			switch vi := vv.(type) {
+			case string:
+				result += "\t" + vi
+			}
+		}
+	}
+	if warn > 0 {
+		c <- _warn(fmt.Sprintf(trans("%d Cmds Verified Failed\n%s"), warn, result))
+	} else {
+		switch v := s["passed"].(type) {
+		case []interface{}:
+			c <- _succ(fmt.Sprintf(trans("%d Cmds Verified Passed"), len(v)))
+		}
 	}
 }
 

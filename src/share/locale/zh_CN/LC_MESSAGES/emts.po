@@ -121,6 +121,12 @@ msgstr "阻塞进程(D): %d"
 msgid "Stat Z Process: %d"
 msgstr "僵死进程(Z): %d"
 
+msgid "%d Cmds Verified Failed\n%s"
+msgstr "%d 个系统程序校验失败(被替换?)\n%s"
+
+msgid "%d Cmds Verified Passed"
+msgstr "%d 个系统程序通过校验"
+
 msgid "OS Restart Recently ?"
 msgstr "系统最近重启过 ?"
 
