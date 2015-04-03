@@ -1102,8 +1102,8 @@ func checkMailLicense(s map[string]interface{}, c *inc.MailLicense) {
 
 	// check threadhold
 	if isOver {
-		fmt.Printf(_crit(trans("Mail System License is Over!\n")))
-		fmt.Printf("\t%s, %s\n", licenseType, details)
+		fmt.Printf(_crit(trans("Mail System License is Over!\n\t%s, %s\n")),
+			licenseType, details)
 		return
 	}
 	if remainDay <= c.RemainDay {
