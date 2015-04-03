@@ -1,0 +1,111 @@
+#!/usr/bin/env perl
+
+BEGIN {
+  my @incs = ();    # set additional path
+  push @INC, @incs;
+};
+
+use strict;
+use warnings;
+use utf8;
+use IO::Socket;
+use IO::Socket::INET;
+binmode(STDIN, ":encoding(utf8)");
+binmode(STDOUT, ":encoding(utf8)");
+binmode(STDERR, ":encoding(utf8)");
+binmode STDOUT, ':raw';
+
+$SIG{'PIPE'} = 'IGNORE';
+
+$| = 1;
+
+sub show_help {
+print <<EOF
+Arguments:    {gearman_addr}
+Usage:   127.0.0.1,4730 127.0.0.1,4730
+
+Output:   
+{gearman_addr} succ
+{gearman_addr} warn errstuff
+
+Example:
+EOF
+;
+exit (0);
+}
+
+unless (scalar @ARGV) {
+  exit (0);
+}
+
+if ($ARGV[0] eq 'h') {
+  show_help;
+}
+
+our $time_out = 5;
+
+while(@ARGV) {
+  my ($gm_host, $gm_port) = (split /,/, shift @ARGV)[0,1];
+  if (!defined $gm_host || !defined $gm_port) {
+	next;
+  }
+  if ($gm_port =~ /\D/) {
+	next;
+  }
+
+  my $gm = IO::Socket::INET->new(
+	PeerAddr =>	$gm_host,
+	PeerPort => 	$gm_port,
+	Proto	 =>	'tcp',
+	Timeout =>	$time_out,
+  );
+  my $address = $gm_host . ':' . $gm_port;
+  unless (defined $gm) {
+	if ($@) {
+		$@ =~ s/[\r\n]//g;
+		printf("%s warn %s\n", $address, $@);
+	} else {
+		printf("%s warn connect error\n", $address);
+	}
+	next;
+  } 
+
+  # run all process in a eval{} with alarm(5)
+  eval {
+	local $SIG{'ALRM'} = sub { die 'Running Timed Out'; };
+	alarm(5);
+
+  	print $gm "version\r\n";	## if without \r, will hang up for 30s.
+	my $iserror = 0;
+  	while (<$gm>) {
+		chomp; s/\A\s*//; s/\s*\Z//;
+		unless (m/\d\Z/) {
+			$iserror = 1;
+		} 
+		last;
+	}
+	if ($iserror) {
+		printf("%s warn ERROR\n", $address);
+		goto BREAK;
+	} 
+	
+	alarm(0);
+  };
+  alarm(0);
+
+  if ($@) {
+        $@ =~ s/[\r\n]//g;
+        if ($@ =~ m/Running Timed Out/) {
+                printf ("%s warn timeout\n", $address);
+        } else {
+                printf ("%s warn %s\n", $address, $@);
+        }
+  } else {
+        printf ("%s succ\n", $address );
+  }
+
+  BREAK:{
+	$gm->close() if ($gm);
+	next;
+  }
+}

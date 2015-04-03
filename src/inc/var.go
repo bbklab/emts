@@ -24,5 +24,6 @@ func init() {
 		"tcpconn":   CheckerDirPath + "/tcpconn",
 		"iostat":    CheckerDirPath + "/iostat",
 		"memcache":  CheckerDirPath + "/memcache",
+		"gearman":   CheckerDirPath + "/gearman",
 	}
 }
