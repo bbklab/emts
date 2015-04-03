@@ -227,10 +227,16 @@ msgid "----: Found eYou Product: Mail System Installed, Version: %s\n"
 msgstr "----: 发现本机安装了eYou邮件系统, 版本[%s]\n"
 
 msgid "%d/%d Memcache Svr Fail\n%s\n"
-msgstr "%d/%d 个Memcache服务异常\n%s\n"
+msgstr "%d/%d 个后端Memcache服务异常\n%s\n"
 
 msgid "%d Memcache Svr OK\n"
-msgstr "%d 个Memcache服务正常\n"
+msgstr "%d 个后端Memcache服务正常\n"
+
+msgid "%d/%d Local Memcache Svr Fail\n%s\n"
+msgstr "%d/%d 个本地Memcache服务异常\n%s\n"
+
+msgid "%d Local Memcache Svr OK\n"
+msgstr "%d 个本地Memcache服务正常\n"
 
 msgid "Result: %s:%s, %s:%s, %s:%s, %s:%s, %s:%s\nScore: %d\n\n\n"
 msgstr "结果: %s:%s, %s:%s, %s:%s, %s:%s, %s:%s\n得分: %d\n\n\n"

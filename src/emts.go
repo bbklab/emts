@@ -238,6 +238,12 @@ func process(sinfo *sjson.Json, config *inc.Config) {
 		checkMailQueue(config.QueueLimit)
 	}
 
+	// if mail startups contains memcache*
+	if strings.Contains(strMailStartups, "memcache") {
+		localmCacheSvr := sinfo.Get("epinfo").Get("mail").Get("svraddr").Get("memcache").MustString()
+		checkMailLocalMCacheSvr(localmCacheSvr)
+	}
+
 	/*
 	   GwCheck:
 
@@ -1189,6 +1195,21 @@ func checkMailQueue(limit int64) {
 			} else {
 				fmt.Printf(_succ(trans("Mail Queue %d\n")), num)
 			}
+		}
+	}
+}
+
+func checkMailLocalMCacheSvr(s string) {
+	args := strings.SplitN(s, " ", -1)
+	result := inc.Caller(inc.Checker["memcache"], args)
+	warn, rest := parseCheckerOutput(result)
+	if warn > 0 {
+		fmt.Printf(_crit(trans("%d/%d Local Memcache Svr Fail\n%s\n")),
+			warn, len(args), rest)
+	} else {
+		if len(result) > 0 { // if indeed have result
+			fmt.Printf(_succ(trans("%d Local Memcache Svr OK\n")),
+				len(args))
 		}
 	}
 }
