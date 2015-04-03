@@ -251,6 +251,8 @@ sub filter_mail_config {
 					smtp_rcpt_num smtp_relayhost remote_helo_host remote_smtproute
 					remote_relay_domain remote_enable_replace_domain remote_replace_domain )
 				   ],
+		# how to connect gearman worker
+		'gmw_innerapi'	=> [ qw( gmw_innerapi ) ],
 		# how to connect user mysql server
 		'usrdb'		=> [ qw( db_mysql_user db_mysql_pass db_mysql_host db_mysql_port db_name ) ],
 		# how to connect user mysql server through mproxy

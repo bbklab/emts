@@ -784,6 +784,7 @@ func checkMailPhpd(mailcfg map[string]interface{}, GMQueueLimit int64) {
 	mailcfg_config := mailcfg["config"]
 	var mailUsrMysql, mailIdxMysql, mailLogMysql map[string]interface{}
 	var mailMemcache map[string]interface{}
+	var mailGmwAddr map[string]interface{}
 	switch config := mailcfg_config.(type) {
 	case map[string]interface{}:
 		switch v := config["usrdb"].(type) {
@@ -802,11 +803,16 @@ func checkMailPhpd(mailcfg map[string]interface{}, GMQueueLimit int64) {
 		case map[string]interface{}:
 			mailMemcache = v
 		}
+		switch v := config["gmw_innerapi"].(type) {
+		case map[string]interface{}:
+			mailGmwAddr = v
+		}
 	}
 
 	checkMailDBSvr(mailMysqlAdmin, mailUsrMysql, mailIdxMysql, mailLogMysql)
 	checkMailGMSvr(mailMysqlCLI, mailUsrMysql, GMQueueLimit)
 	checkMailMCacheSvr(mailMemcache)
+	checkMailGmwSvr(mailGmwAddr)
 }
 
 func checkMailDBSvr(mysqladmin string, userdb, idxdb, logdb map[string]interface{}) {
@@ -1175,11 +1181,31 @@ func checkMailMCacheSvr(s map[string]interface{}) {
 	result := inc.Caller(inc.Checker["memcache"], args)
 	warn, rest := parseCheckerOutput(result)
 	if warn > 0 {
-		fmt.Printf(_crit(trans("%d/%d Memcache Svr Fail\n%s\n")),
+		fmt.Printf(_crit(trans("%d/%d Backend Memcache Svr Fail\n%s\n")),
 			warn, len(args), rest)
 	} else {
 		if len(result) > 0 { // if indeed have result
-			fmt.Printf(_succ(trans("%d Memcache Svr OK\n")),
+			fmt.Printf(_succ(trans("%d Backend Memcache Svr OK\n")),
+				len(args))
+		}
+	}
+}
+
+func checkMailGmwSvr(s map[string]interface{}) {
+	args := make([]string, 0)
+	switch v := s["gmw_innerapi"].(type) {
+	case string:
+		temp := strings.Replace(v, ":", ",", -1)
+		args = append(args, temp)
+	}
+	result := inc.Caller(inc.Checker["gearman"], args)
+	warn, rest := parseCheckerOutput(result)
+	if warn > 0 {
+		fmt.Printf(_crit(trans("%d/%d Backend Gearman Svr Fail\n%s\n")),
+			warn, len(args), rest)
+	} else {
+		if len(result) > 0 { // if indeed have result
+			fmt.Printf(_succ(trans("%d Backend Gearman Svr OK\n")),
 				len(args))
 		}
 	}
