@@ -244,6 +244,12 @@ func process(sinfo *sjson.Json, config *inc.Config) {
 		checkMailLocalMCacheSvr(localmCacheSvr)
 	}
 
+	// if mail startups contains gearman*
+	if strings.Contains(strMailStartups, "gearman") {
+		localGmSvr := sinfo.Get("epinfo").Get("mail").Get("svraddr").Get("gearman").MustString()
+		checkMailLocalGmSvr(localGmSvr)
+	}
+
 	/*
 	   GwCheck:
 
@@ -1235,6 +1241,21 @@ func checkMailLocalMCacheSvr(s string) {
 	} else {
 		if len(result) > 0 { // if indeed have result
 			fmt.Printf(_succ(trans("%d Local Memcache Svr OK\n")),
+				len(args))
+		}
+	}
+}
+
+func checkMailLocalGmSvr(s string) {
+	args := strings.SplitN(s, " ", -1)
+	result := inc.Caller(inc.Checker["gearman"], args)
+	warn, rest := parseCheckerOutput(result)
+	if warn > 0 {
+		fmt.Printf(_crit(trans("%d/%d Local Gearman Svr Fail\n%s\n")),
+			warn, len(args), rest)
+	} else {
+		if len(result) > 0 { // if indeed have result
+			fmt.Printf(_succ(trans("%d Local Gearman Svr OK\n")),
 				len(args))
 		}
 	}
