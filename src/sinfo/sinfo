@@ -35,11 +35,11 @@ our %data_config = (
   'netstat'		=> 1,
   'cmdverify'		=> 1,
   'disk_space'		=> 1,
-  'cpu_usage'		=> 1,
   'disk_fsio'		=> 1,
 
   # new added
   'process_top'		=> 1,
+  'cpu_usage'		=> 1,		# infact, this config is unless, cpu_usage depend on (same as) process_top
 
   # original system_fixinfo
   'product_info'	=> 1,
@@ -559,35 +559,6 @@ if ($data_config{'disk_space'}) {
   $result{'disk_space'} = \@disk_space;
 }
 
-# cpu_usage
-if ($data_config{'cpu_usage'}) {
-   my %cpu_usage = ();
-   my $vmstat = '/usr/bin/vmstat';
-   if (-f $vmstat && -x $vmstat) {
-	my $sampleNum = 5;
-	open my $fh, "$vmstat 1 $sampleNum 2>&- |";
-	if ($fh) {
-		while (<$fh>) {
-			chomp; s/\A\s*//; s/\s*\Z//;
-			next unless m/\A\s*\d+/;
-			my @tmp_arr = split /\s+/;
-			if (scalar @tmp_arr ne 17) {
-				next;
-			}
-			$cpu_usage{'id'} += $tmp_arr[14];
-			$cpu_usage{'wa'} += $tmp_arr[15];
-			$cpu_usage{'sy'} += $tmp_arr[13];
-			$cpu_usage{'us'} += $tmp_arr[12];
-		}
-	}
-	foreach my $i (keys %cpu_usage) {
-		$cpu_usage{$i} = sprintf("%0.2f",$cpu_usage{$i}/$sampleNum);
-	}
-   }
-   ### %cpu_usage
-   $result{'cpu_usage'} = \%cpu_usage;
-}
-
 # disk_fsio
 if ($data_config{'disk_fsio'}) {
   my %disk_fsio = ();
@@ -639,21 +610,37 @@ if ($data_config{'disk_fsio'}) {
 # process_top
 if ($data_config{'process_top'}) {
   my %process_top = ();
+  my %cpu_usage = ();
   my $top = '/usr/bin/top';
   if (-f $top && -x $top) {
 	# save process number and memory/cpu usage into %ps_details
 	my %ps_details = ();
-	open my $fh, "$top -n 1 -d 1 -b 2>&- |";
+	my $number = 2;
+	my $i = 0;
+	open my $fh, "$top -n $number -d 1 -b 2>&- |";
 	if ($fh) {
 		while (<$fh>) {
 			chomp; s/\A\s*//; s/\s*\Z//;
-			next unless m/\A\s*\d+/;
-			my @tmp_arr = split /\s+/;
-			if ($tmp_arr[11] && $tmp_arr[1]) {
-				my $psindex = sprintf("%s(%s)",$tmp_arr[11],$tmp_arr[1]);
-				$ps_details{$psindex}{'num'} ++;
-				$ps_details{$psindex}{'cpu'} += $tmp_arr[8];
-				$ps_details{$psindex}{'mem'} += &c2kb($tmp_arr[5]) ;
+			if (m/\ACpu.*:[ \t]*/i) {
+				$i ++;
+				if (($number-$i) eq 0) { # only collect last top output
+					m/[ \t]*(\S+?)%id,/; $cpu_usage{'id'} = $1;
+					m/[ \t]*(\S+?)%wa,/; $cpu_usage{'wa'} = $1;
+					m/[ \t]*(\S+?)%sy,/; $cpu_usage{'sy'} = $1;
+					m/[ \t]*(\S+?)%us,/; $cpu_usage{'us'} = $1;
+				}
+				next;
+			} 
+
+			if (($number-$i) eq 0) { # only collect last top output
+				next unless m/\A\s*\d+/;
+				my @tmp_arr = split /\s+/;
+				if ($tmp_arr[11] && $tmp_arr[1]) {
+					my $psindex = sprintf("%s(%s)",$tmp_arr[11],$tmp_arr[1]);
+					$ps_details{$psindex}{'num'} ++;
+					$ps_details{$psindex}{'cpu'} += $tmp_arr[8];
+					$ps_details{$psindex}{'mem'} += &c2kb($tmp_arr[5]) ;
+				}
 			}
 		}
 	}
@@ -698,6 +685,9 @@ if ($data_config{'process_top'}) {
   }
   ### %process_top
   $result{'process_top'} = \%process_top;
+
+  ### %cpu_usage
+  $result{'cpu_usage'} = \%cpu_usage;
 }
 
 
