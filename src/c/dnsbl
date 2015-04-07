@@ -24,9 +24,6 @@ exposed_addr=$*
 
 # if null return STATE_UNKN.
 
-# if null or invalid set default.
-[ -z "${dns_check_lst}" ] && dns_check_lst="eyou.net:mx,ns"
-
 # is_ipaddr function here
 is_ipaddr() {
 	echo "${1}" | grep -E -q "^(([0-9]|([1-9][0-9])|(1[0-9]{2})|(2([0-4][0-9]|5[0-5])))\.){3}([1-9]|([1-9][0-9])|(1[0-9]{2})|(2([0-4][0-9]|5[0-5])))$"

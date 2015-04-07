@@ -202,7 +202,7 @@ func process(sinfo *sjson.Json, config *inc.Config) {
 	}
 
 	checkSudoTTY()
-	checkCfgFile()
+	checkCfgFileDupli()
 
 	// get eyou mail startups
 	arrMailStartups, err := sinfo.Get("epinfo").Get("mail").Get("startups").StringArray()
@@ -739,7 +739,72 @@ func checkSudoTTY() {
 	}
 }
 
-func checkCfgFile() {
+func checkCfgFileDupli() {
+	baseCfgDir := "/usr/local/eyou/mail/etc/"
+	fileIniWithSec := []string{
+		"em_clear_tempfile.ini",
+		"em_filed_monitor.ini",
+		"em_init.ini",
+		"em_migrate.ini",
+		"em_monitor.ini",
+		"em_mta.ini",
+		"em_phpd.ini",
+		"em_plugins.ini",
+		"em_process_dblog.ini",
+		"em_register_auth.ini",
+		"em_register.ini",
+		"em_searchmail.ini",
+		"em_statistics_auth.ini",
+		"em_statistics_deliver_mail.ini",
+		// em_help_keywords.ini
+		// em_rcd.ini
+	}
+	fileIniNosec := []string{
+		"em_filed_repc.ini",
+		"eyou_mail.ini",
+	}
+
+	files := []string{"sec"}
+	for _, fname := range fileIniWithSec {
+		fpath := baseCfgDir + "/" + fname
+		if finfo, err := os.Stat(fpath); err == nil {
+			if finfo.Mode().IsRegular() {
+				files = append(files, fpath)
+			}
+		}
+	}
+	result := inc.Caller(inc.Checker["cfgfiledupli"], files)
+	warn, rest := parseCheckerOutput(result)
+	if warn > 0 {
+		fmt.Printf(_warn(trans("%d/%d Cfg File Contains Duplicated Sections or Configs\n%s\n")),
+			warn, len(files)-1, rest)
+	} else {
+		if len(result) > 0 { // if indeed have result
+			fmt.Printf(_succ(trans("%d Cfg File Not Contains Duplicated Sections or Configs\n")),
+				len(files)-1)
+		}
+	}
+
+	files = []string{"nosec"}
+	for _, fname := range fileIniNosec {
+		fpath := baseCfgDir + "/" + fname
+		if finfo, err := os.Stat(fpath); err == nil {
+			if finfo.Mode().IsRegular() {
+				files = append(files, fpath)
+			}
+		}
+	}
+	result = inc.Caller(inc.Checker["cfgfiledupli"], files)
+	warn, rest = parseCheckerOutput(result)
+	if warn > 0 {
+		fmt.Printf(_warn(trans("%d/%d Cfg File Contains Duplicated Configs\n%s\n")),
+			warn, len(files)-1, rest)
+	} else {
+		if len(result) > 0 { // if indeed have result
+			fmt.Printf(_succ(trans("%d Cfg File Not Contains Duplicated Configs\n")),
+				len(files)-1)
+		}
+	}
 }
 
 func checkMailSvr(ss map[string]interface{}) {

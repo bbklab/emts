@@ -1,0 +1,117 @@
+#!/bin/bash
+
+# Show Help
+show_help(){
+cat <<EOF
+Argument: {mode} filepath1 filepath2 ....
+     {mode} ~ sec/nosec
+Example:   sec   /usr/local/eyou/mail/etc/em_mta.ini
+Example:   nosec /usr/local/eyou/mail/etc/eyou_mail.ini
+
+Output:
+{filepath} warn duplication-cfg-stuffs
+{filepath} succ
+
+Example:
+EOF
+exit 0;
+}
+[ "$1" == "help" -o "$1" == "h" ] && show_help;
+
+mode="$1"; shift;
+filelst=$*
+
+list_all_section() {
+  local file=$1
+  local result=
+  # Do NOT pass widechars such as chinese input to sed, which will lead to hangup in some circumstances.
+  result=$( cat ${file} 2>&- | grep -E -v "^[ \t]*;" | tr -d ' \t' |\
+                sed -e '/^\[.*\]$/!d;/^\[[ \t]*\]$/d;s/^\[//;s/\]$//;' 2>&- |\
+                tr '\r\n' ' ')
+  echo "${result}"
+}
+
+list_section_keys(){
+  local file=$1 section=$2
+  local result=
+  result=$( cat ${file} 2>&- | tr '\t' ' ' |\
+                awk -F"=" '\
+                        ($0~/^ *\[ *'${section}' *\] *$/){k=1;x=1;next} \
+                        ( x==1 && $0~/^ *\[ *.* *\] *$/ && $0!~/^ *\[ *'${section}' *\] *$/ ){exit} \
+                        (k==1 && x==1 && $0!~/^[ \t]*$/ && $0!~/^[ \t]*;/){print $1}' |\
+                sed -e 's/^[ \t]*//; s/[ \t]*$//; s/^\"//; s/\"$//' 2>&-)
+  echo "${result}"
+}
+
+check() {
+
+	if [ "${mode}" != "sec" ] && [ "${mode}" != "nosec" ]; then
+		return
+	fi
+
+	if [ "${mode}" == "sec" ]; then
+		for cfgfile in ${filelst}; do
+			local dn=0 dups=
+			# check config file contains duplicated section name or not ?
+			duplsection=$( cat ${cfgfile} |\
+				tr -d ' \t' |\
+				awk '($0~/^[ \t]*\[[ \t]*.*[ \t]*\][ \t]*$/){print NR,$0}' |\
+				awk '{a[$2]++;} END{for(i in a){if(a[i]>1){print a[i],i}}}' )
+			if [ -n "${duplsection//[ ]}" ]; then
+				((dn++))
+				duplsection=$(echo -e "${duplsection}" | awk '{printf "%s:%s ",$1,$2}')
+				if [ -z "${dups}" ]; then
+					dups="${duplsection}"
+				else
+					dups="${dups} ${duplsection}"
+				fi
+			else
+				# check if exists duplicated key name under one same section or not ?
+				for section in `list_all_section "${cfgfile}"`; do
+					duplkey=$( list_section_keys  "${cfgfile}" "${section}" |\
+							awk '{a[$1]++} END{for(i in a){if(a[i]>1){print a[i],i}}}' )
+					if [ -n "${duplkey//[ ]}" ]; then
+						((dn++))
+						duplkey=$(echo -e "${duplkey}" | awk '{printf "%s:%s,",$1,$2}')
+						if [ -z "${dups}" ]; then
+							dups="[${section}]:${duplkey}"
+						else
+							dups="${dups} [${section}]:${duplkey}"
+						fi
+					fi
+				done
+			fi
+			# prepare last result
+			if [ ${dn} -eq 0 ]; then
+				echo "${cfgfile##*/} succ"
+			else
+				echo "${cfgfile##*/} warn ${dups}"
+			fi
+		done
+	elif [ "${mode}" == "nosec" ]; then
+		for cfgfile in ${filelst}; do
+			local dn=0 dups=
+			duplkey=$( cat ${cfgfile} 2>&- |  grep -E -v "^[ \t]*;" | tr -d ' \t' |\
+					awk -F"=" '($0~/=/){print $1}' | sed -e 's/^[ \t]*//g; s/[ \t]*$//g' |\
+					awk '{a[$1]++} END{for(i in a){if(a[i]>1){print a[i],i}}}'
+			)
+			if [ -n "${duplkey//[ ]}" ]; then
+				((dn++))
+				duplkey=$(echo -e "${duplkey}" | awk '{printf "%s:%s ",$1,$2}')
+				if [ -z "${dups}" ]; then
+					dups="${duplkey}"
+				else
+					dups="${dups} ${duplkey}"
+				fi
+			fi
+			# prepare last result
+			if [ ${dn} -eq 0 ]; then
+				echo "${cfgfile##*/} succ"
+			else
+				echo "${cfgfile##*/} warn ${dups}"
+			fi
+		done
+	fi
+}
+
+check
