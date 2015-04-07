@@ -255,26 +255,10 @@ func process(sinfo *sjson.Json, config *inc.Config) {
 		checkMailLocalGmSvr(localGmSvr)
 	}
 
-	/*
-	   GwCheck:
-
-	   	// check if eyou gw installed or not ?
-	   	if gwIsInstalled == 0 {
-	   		goto EpushCheck
-	   	}
-
-	   	return
-
-	   EpushCheck:
-
-	   	// check if eyou push installed or not ?
-	   	if epushIsInstalled == 0 {
-	   		return
-	   	}
-
-	   	return
-	*/
-
+	// if mail startups contains mysql*
+	if strings.Contains(strMailStartups, "mysql") {
+		checkMailMysqlRepl()
+	}
 }
 
 func checkSysStartups(c chan string, ss []string, must []string) {
@@ -1276,6 +1260,26 @@ func checkMailLocalGmSvr(s string) {
 		if len(result) > 0 { // if indeed have result
 			fmt.Printf(_succ(trans("%d Local Gearman Svr OK\n")),
 				len(args))
+		}
+	}
+}
+
+func checkMailMysqlRepl() {
+	args := []string{
+		"/usr/local/eyou/mail/opt/mysql/bin/mysql",
+		"127.0.0.1,3306,eyou,eyou",
+		"127.0.0.1,3316,eyou,eyou",
+		"127.0.0.1,3326,eyou,eyou",
+	}
+	result := inc.Caller(inc.Checker["mysqlrepl"], args)
+	warn, rest := parseCheckerOutput(result)
+	if warn > 0 {
+		fmt.Printf(_crit(trans("%d/%d Local Mysql Replication Fail\n%s\n")),
+			warn, len(args)-1, rest)
+	} else {
+		if len(result) > 0 { // if indeed have result
+			fmt.Printf(_succ(trans("%d Local Mysql Replication OK\n")),
+				len(args)-1)
 		}
 	}
 }

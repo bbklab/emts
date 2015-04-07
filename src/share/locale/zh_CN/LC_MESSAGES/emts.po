@@ -250,5 +250,11 @@ msgstr "%d/%d 个本地Gearman服务异常\n%s\n"
 msgid "%d Local Gearman Svr OK\n"
 msgstr "%d 个本地Gearman服务正常\n"
 
+msgid "%d/%d Local Mysql Replication Fail\n%s\n"
+msgstr "%d/%d 个本地Mysql复制异常\n%s\n"
+
+msgid "%d Local Mysql Replication OK\n"
+msgstr "%d 个本地Mysql复制正常\n"
+
 msgid "Result: %s:%s, %s:%s, %s:%s, %s:%s, %s:%s\nScore: %d\n\n\n"
 msgstr "结果: %s:%s, %s:%s, %s:%s, %s:%s, %s:%s\n得分: %d\n\n\n"

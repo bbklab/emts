@@ -81,11 +81,15 @@ check() {
 				(/^[ \t]*Last_SQL_Error:/){print "last_sqlerror=\""$2"\";";next} \
 			    ' "${tmpfile}" 2>&- )
 			if [ "${io_running}" != "Yes" ] || [ "${sql_running}" != "Yes" ]; then
-				result="${result} warn IO Thread:${io_running}; SQL Thread:${sql_running}; Last ErrNo:${last_errno}; Last Error:${last_error};"
-				result="${result} Last IO Errno:${last_ioerrno}; Last IO Error:${last_ioerror};"
-				result="${result} Last SQL Errno:${last_sqlerrno}; Last SQL Error:${last_sqlerror}"
+				result="warn IO Thread:${io_running}; SQL Thread:${sql_running};"
+				if [ "${io_running}" != "Yes" ]; then
+					result="${result} Last IO Errno:${last_ioerrno}; Last IO Error:${last_ioerror};"
+				fi
+				if [ "${sql_running}" != "Yes" ]; then
+					result="${result} Last SQL Errno:${last_sqlerrno}; Last SQL Error:${last_sqlerror}"
+				fi
 			else
-				result="${result} succ IO/SQL Thread Running"
+				result="succ IO/SQL Thread Running"
 			fi
 		fi
 	fi
