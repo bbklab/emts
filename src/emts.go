@@ -236,6 +236,11 @@ func process(sinfo *sjson.Json, config *inc.Config) {
 	// if mail startups contains remote or local
 	if strings.Contains(strMailStartups, "remote") || strings.Contains(strMailStartups, "local") {
 		checkMailQueue(config.QueueLimit)
+
+		if strings.Contains(strMailStartups, "remote") {
+			cfgRemoteHelo := sinfo.Get("epinfo").Get("mail").Get("config").Get("common").Get("remote_helo_host").MustString()
+			checkCfgRemoteHelo(cfgRemoteHelo)
+		}
 	}
 
 	// if mail startups contains memcache*
@@ -1234,6 +1239,14 @@ func checkMailQueue(limit int64) {
 				fmt.Printf(_succ(trans("Mail Queue %d\n")), num)
 			}
 		}
+	}
+}
+
+func checkCfgRemoteHelo(s string) {
+	if s == "test.eyou.net" {
+		fmt.Printf(_note(trans("remote_helo_host = %s\n")), s)
+	} else {
+		fmt.Printf(_succ(trans("remote_helo_host = %s\n")), s)
 	}
 }
 
