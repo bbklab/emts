@@ -178,8 +178,8 @@ msgstr "sudo Requiretty 选项未关闭\n"
 msgid "sudo Ignore TTY\n"
 msgstr "sudo Requiretty 选项已关闭\n"
 
-msgid "%d %s Mail Service Fail\n%s\n"
-msgstr "%d 个 %s 邮件服务组件异常\n%s\n"
+msgid "%d/%d %s Mail Service Fail\n%s\n"
+msgstr "%d/%d 个 %s 邮件服务组件异常\n%s\n"
 
 msgid "%d %s Mail Service\n"
 msgstr "%d 个 %s 邮件服务组件正常\n"
