@@ -438,14 +438,14 @@ if (-f $gw_mysqlcli && -x $gw_mysqlcli) {
 				next;
 			}
 			if (m/\A\s*start_date:\s*(\d+)\s*\Z/) {
-				eval { $gw_license{'start_date'} = sprintf("%s",strftime("%Y-%m-%d_%H:%M:%S", localtime($1))); };
+				eval { $gw_license{'start_date'} = sprintf("%s",strftime("%Y-%m-%d %H:%M:%S", localtime($1))); };
 				if ($@) {
 					$gw_license{'start_date'} = $1;
 				}
 				next;
 			}
 			if (m/\A\s*expire_date:\s*(\d+)\s*\Z/) {
-				eval { $gw_license{'expire_date'} = sprintf("%s",strftime("%Y-%m-%d_%H:%M:%S", localtime($1))); };
+				eval { $gw_license{'expire_date'} = sprintf("%s",strftime("%Y-%m-%d %H:%M:%S", localtime($1))); };
 				if ($@) {
 					$gw_license{'expire_date'} = $1;
 				}
