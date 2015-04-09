@@ -1371,7 +1371,7 @@ func runGwCheck(sinfo *sjson.Json, config *inc.Config) {
 }
 
 func checkHosts() {
-	reg := regexp.MustCompilePOSIX("^[ \t]*127.0.0.1(.*)[ \t]+localhost[ \t]+")
+	reg := regexp.MustCompilePOSIX("^[ \t]*127.0.0.1(.*)[ \t]+localhost[[:space:]]")
 	file := "/etc/hosts"
 	if inc.FGrepBool(file, reg) {
 		fmt.Printf(_succ(trans("hosts Contains 127.0.0.1->localhost\n")))
