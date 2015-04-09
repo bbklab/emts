@@ -23,6 +23,7 @@ type Config struct {
 	GMQueueLimit   int64
 	QueueLimit     int64
 	MailLicense    *MailLicense
+	GwLicense      *GwLicense
 }
 
 type SysProcess struct {
@@ -40,6 +41,10 @@ type MailLicense struct {
 	RemainRate float64
 	RemainSum  int64
 	RemainDay  int64
+}
+
+type GwLicense struct {
+	RemainDay int64
 }
 
 func NewConfig(cfile string) (*Config, error) {

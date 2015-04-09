@@ -80,7 +80,7 @@ func process(sinfo *sjson.Json, config *inc.Config) {
 	// first set var about eyou product isInstalled ?
 	mailIsInstalled := sinfo.Get("epinfo").Get("mail").Get("is_installed").MustInt()
 	//mail4IsInstalled := sinfo.Get("epinfo").Get("mail4").Get("is_installed").MustInt()
-	//gwIsInstalled := sinfo.Get("epinfo").Get("gw").Get("is_installed").MustInt()
+	gwIsInstalled := sinfo.Get("epinfo").Get("gw").Get("is_installed").MustInt()
 	//archiveIsInstalled := sinfo.Get("epinfo").Get("archive").Get("is_installed").MustInt()
 	//epushIsInstalled := sinfo.Get("epinfo").Get("epush").Get("is_installed").MustInt()
 
@@ -187,78 +187,23 @@ func process(sinfo *sjson.Json, config *inc.Config) {
 	/*
 		begin eyou mail related check
 	*/
-	// check if eyou mail installed or not ?
-	if mailIsInstalled == 0 {
-		return
-		// goto GwCheck
+	if mailIsInstalled == 1 {
+		emVersion := sinfo.Get("epinfo").Get("mail").Get("emversion").MustString()
+		fmt.Printf(trans("----: Found eYou Product: Mail System Installed, Version: %s\n"),
+			emVersion)
+		runMailCheck(sinfo, config)
 	}
 
-	emVersion := sinfo.Get("epinfo").Get("mail").Get("emversion").MustString()
-	fmt.Printf(trans("----: Found eYou Product: Mail System Installed, Version: %s\n"),
-		emVersion)
-
-	if sysStartups, err := sinfo.Get("startups").StringArray(); err == nil {
-		checkMailStartups(sysStartups, []string{"eyou_mail"})
+	/*
+		begin eyou gw related check
+	*/
+	if gwIsInstalled == 1 {
+		egwVersion := sinfo.Get("epinfo").Get("gw").Get("version").MustString()
+		fmt.Printf(trans("----: Found eYou Product: Gateway System Installed, Version: %s\n"),
+			egwVersion)
+		runGwCheck(sinfo, config)
 	}
 
-	checkSudoTTY()
-	checkCfgFileDupli()
-
-	// get eyou mail startups
-	arrMailStartups, err := sinfo.Get("epinfo").Get("mail").Get("startups").StringArray()
-	if err != nil {
-		return
-	}
-	strMailStartups := strings.Join(arrMailStartups, " ")
-
-	// if mail startups contains phpd
-	if strings.Contains(strMailStartups, "phpd") {
-		mailConfigs := sinfo.Get("epinfo").Get("mail").MustMap()
-		checkMailPhpd(mailConfigs, config.GMQueueLimit)
-	}
-
-	// if mail startups contains pop/pop3 or smtp or imap
-	if strings.Contains(strMailStartups, "pop3") ||
-		strings.Contains(strMailStartups, "pop") ||
-		strings.Contains(strMailStartups, "smtp") ||
-		strings.Contains(strMailStartups, "imap") {
-
-		mailLicense := sinfo.Get("epinfo").Get("mail").Get("license").MustMap()
-		checkMailLicense(mailLicense, config.MailLicense)
-
-		mailConfigs := sinfo.Get("epinfo").Get("mail").MustMap()
-		checkMailMproxySvr(mailConfigs)
-
-		mailSvrAddr := sinfo.Get("epinfo").Get("mail").Get("svraddr").MustMap()
-		checkMailSvr(mailSvrAddr)
-	}
-
-	// if mail startups contains remote or local
-	if strings.Contains(strMailStartups, "remote") || strings.Contains(strMailStartups, "local") {
-		checkMailQueue(config.QueueLimit)
-
-		if strings.Contains(strMailStartups, "remote") {
-			cfgRemoteHelo := sinfo.Get("epinfo").Get("mail").Get("config").Get("common").Get("remote_helo_host").MustString()
-			checkCfgRemoteHelo(cfgRemoteHelo)
-		}
-	}
-
-	// if mail startups contains memcache*
-	if strings.Contains(strMailStartups, "memcache") {
-		localmCacheSvr := sinfo.Get("epinfo").Get("mail").Get("svraddr").Get("memcache").MustString()
-		checkMailLocalMCacheSvr(localmCacheSvr)
-	}
-
-	// if mail startups contains gearman*
-	if strings.Contains(strMailStartups, "gearman") {
-		localGmSvr := sinfo.Get("epinfo").Get("mail").Get("svraddr").Get("gearman").MustString()
-		checkMailLocalGmSvr(localGmSvr)
-	}
-
-	// if mail startups contains mysql*
-	if strings.Contains(strMailStartups, "mysql") {
-		checkMailMysqlRepl()
-	}
 }
 
 func checkSysStartups(c chan string, ss []string, must []string) {
@@ -695,6 +640,71 @@ func checkDnsbl(s string, cs []string) {
 			fmt.Printf(_succ(trans("%d Exposed IPAddress NOT Listed in DNSBL\n")),
 				len(ips))
 		}
+	}
+}
+
+func runMailCheck(sinfo *sjson.Json, config *inc.Config) {
+	if sysStartups, err := sinfo.Get("startups").StringArray(); err == nil {
+		checkMailStartups(sysStartups, []string{"eyou_mail"})
+	}
+
+	checkSudoTTY()
+	checkCfgFileDupli()
+
+	// get eyou mail startups
+	arrMailStartups, err := sinfo.Get("epinfo").Get("mail").Get("startups").StringArray()
+	if err != nil {
+		return
+	}
+	strMailStartups := strings.Join(arrMailStartups, " ")
+
+	// if mail startups contains phpd
+	if strings.Contains(strMailStartups, "phpd") {
+		mailConfigs := sinfo.Get("epinfo").Get("mail").MustMap()
+		checkMailPhpd(mailConfigs, config.GMQueueLimit)
+	}
+
+	// if mail startups contains pop/pop3 or smtp or imap
+	if strings.Contains(strMailStartups, "pop3") ||
+		strings.Contains(strMailStartups, "pop") ||
+		strings.Contains(strMailStartups, "smtp") ||
+		strings.Contains(strMailStartups, "imap") {
+
+		mailLicense := sinfo.Get("epinfo").Get("mail").Get("license").MustMap()
+		checkMailLicense(mailLicense, config.MailLicense)
+
+		mailConfigs := sinfo.Get("epinfo").Get("mail").MustMap()
+		checkMailMproxySvr(mailConfigs)
+
+		mailSvrAddr := sinfo.Get("epinfo").Get("mail").Get("svraddr").MustMap()
+		checkMailSvr(mailSvrAddr)
+	}
+
+	// if mail startups contains remote or local
+	if strings.Contains(strMailStartups, "remote") || strings.Contains(strMailStartups, "local") {
+		checkMailQueue(config.QueueLimit)
+
+		if strings.Contains(strMailStartups, "remote") {
+			cfgRemoteHelo := sinfo.Get("epinfo").Get("mail").Get("config").Get("common").Get("remote_helo_host").MustString()
+			checkCfgRemoteHelo(cfgRemoteHelo)
+		}
+	}
+
+	// if mail startups contains memcache*
+	if strings.Contains(strMailStartups, "memcache") {
+		localmCacheSvr := sinfo.Get("epinfo").Get("mail").Get("svraddr").Get("memcache").MustString()
+		checkMailLocalMCacheSvr(localmCacheSvr)
+	}
+
+	// if mail startups contains gearman*
+	if strings.Contains(strMailStartups, "gearman") {
+		localGmSvr := sinfo.Get("epinfo").Get("mail").Get("svraddr").Get("gearman").MustString()
+		checkMailLocalGmSvr(localGmSvr)
+	}
+
+	// if mail startups contains mysql*
+	if strings.Contains(strMailStartups, "mysql") {
+		checkMailMysqlRepl()
 	}
 }
 
@@ -1347,6 +1357,91 @@ func checkMailMysqlRepl() {
 				len(args)-1)
 		}
 	}
+}
+
+func runGwCheck(sinfo *sjson.Json, config *inc.Config) {
+	checkHosts()
+	checkCronJob()
+
+	egwVersion := sinfo.Get("epinfo").Get("gw").Get("version").MustString()
+	checkGwVersion(egwVersion)
+
+	gwLicense := sinfo.Get("epinfo").Get("gw").Get("license").MustMap()
+	checkGwLicense(gwLicense, config.GwLicense)
+}
+
+func checkHosts() {
+	reg := regexp.MustCompilePOSIX("^[ \t]*127.0.0.1(.*)[ \t]+localhost[ \t]+")
+	file := "/etc/hosts"
+	if inc.FGrepBool(file, reg) {
+		fmt.Printf(_succ(trans("hosts Contains 127.0.0.1->localhost\n")))
+	} else {
+		fmt.Printf(_warn(trans("hosts Not Contains 127.0.0.1->localhost\n")))
+	}
+}
+
+func checkCronJob() {
+	reg := regexp.MustCompilePOSIX("/var/emdg/sbin/notify_mail")
+	file := "/var/spool/cron/nobody"
+	if inc.FGrepBool(file, reg) {
+		fmt.Printf(_succ(trans("CronJob Notify Mail Prepared!\n")))
+	} else {
+		fmt.Printf(_atte(trans("Close CronJob of Notify Mail?\n")))
+	}
+}
+
+func checkGwVersion(s string) {
+	version := string([]byte(s)[0:3])
+	if ver, err := strconv.ParseFloat(version, 64); err == nil {
+		if ver < 4.1 {
+			fmt.Printf(_note(trans("Better to Upgrade Nower Gw Version %s\n")),
+				s)
+		} else {
+			fmt.Printf(_succ(trans("Nower Gw Vesion: %s\n")),
+				s)
+		}
+	}
+}
+
+func checkGwLicense(s map[string]interface{}, c *inc.GwLicense) {
+	var remainDay int64
+	var details string
+	switch v := s["license_type"].(type) {
+	case string:
+		switch v {
+		case "0":
+			details += fmt.Sprintf(trans("License Type: Official, "))
+		case "1":
+			details += fmt.Sprintf(trans("License Type: Trial, "))
+		case "2":
+			details += fmt.Sprintf(trans("License Type: Initial, "))
+		default:
+			details += fmt.Sprintf(trans("License Type: Unknown, "))
+		}
+	}
+	switch v := s["max_child"].(type) {
+	case string:
+		details += fmt.Sprintf(trans("Max Child: %s, "),
+			v)
+	}
+	switch v := s["expire_date"].(type) {
+	case string:
+		if t, err := time.Parse("2006-01-02 15:04:05", v); err == nil {
+			temp := t.Sub(time.Now())
+			remainDay = int64(temp.Seconds() / 3600 / 24)
+			details += fmt.Sprintf(trans("Remain Day %d"),
+				remainDay)
+		} else {
+			fmt.Println(err)
+		}
+	}
+	// check threadhold
+	if remainDay <= c.RemainDay {
+		fmt.Printf(_warn(trans("Gw System License Remain Day %d\n\t%s\n")),
+			remainDay, details)
+		return
+	}
+	fmt.Println(_succ(details))
 }
 
 func parseCheckerOutput(s string) (int, string) {

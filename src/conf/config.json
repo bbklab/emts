@@ -26,5 +26,8 @@
     "RemainSum":  100,
     "RemainRate": 10.00,
     "RemainDay":  30
+  },
+  "GwLicense":      {
+    "RemainDay": 30
   }
 }

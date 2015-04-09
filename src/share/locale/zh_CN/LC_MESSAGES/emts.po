@@ -268,5 +268,44 @@ msgstr "%d/%d 个非标准INI配置文件包含重复配置项\n%s\n"
 msgid "%d Cfg File Not Contains Duplicated Configs\n"
 msgstr "%d 个非标准INI配置文件通过重复配置项检查\n"
 
+msgid "----: Found eYou Product: Gateway System Installed, Version: %s\n"
+msgstr "----: 发现本机安装了eYou网关系统, 版本[%s]\n"
+
+msgid "hosts Contains 127.0.0.1->localhost\n"
+msgstr "localhost地址映射就绪\n"
+
+msgid "hosts Not Contains 127.0.0.1->localhost\n"
+msgstr "缺失localhost地址映射\n"
+
+msgid "CronJob Notify Mail Prepared!\n"
+msgstr "提醒信计划任务就绪\n"
+
+msgid "Close CronJob of Notify Mail?\n"
+msgstr "关闭了所有提醒信计划任务?\n"
+
+msgid "Better to Upgrade Nower Gw Version %s\n"
+msgstr "当前网关版本 %s 较旧, 建议升级\n"
+
+msgid "Nower Gw Vesion: %s\n"
+msgstr "当前网关版本: %s\n"
+
+msgid "License Type: Official, "
+msgstr "网关许可证类型: 正式版, "
+
+msgid "License Type: Trial, "
+msgstr "网关许可证类型: 试用版, "
+
+msgid "License Type: Initial, "
+msgstr "网关许可证类型: 初始安装版, "
+
+msgid "License Type: Unknown, "
+msgstr "网关许可证类型: 未知, "
+
+msgid "Max Child: %s, "
+msgstr "最大用户数: %s, "
+
+msgid "Gw System License Remain Day %d\n\t%s\n"
+msgstr "网关许可证剩余使用天数: %d\n\t%s\n"
+
 msgid "Result: %s:%s, %s:%s, %s:%s, %s:%s, %s:%s\nScore: %d\n\n\n"
 msgstr "结果: %s:%s, %s:%s, %s:%s, %s:%s, %s:%s\n得分: %d\n\n\n"
