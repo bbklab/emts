@@ -484,6 +484,26 @@ if (-f $gw_mailconf && -r $gw_mailconf) {
 				$gw_configs{'product_type'} = $1;
 				next;
 			}
+			if (m/\A\s*abroad_proxy_on\s*(.+)\s*\Z/) {
+				$gw_configs{'abroad_proxy_on'} = $1;
+				next;
+			}
+			if (m/\A\s*abroad_proxy_ip\s*(.+)\s*\Z/) {
+				$gw_configs{'abroad_proxy_ip'} = $1;
+				next;
+			}
+			if (m/\A\s*abroad_proxy_port\s*(.+)\s*\Z/) {
+				$gw_configs{'abroad_proxy_port'} = $1;
+				next;
+			}
+			if (m/\A\s*remote_all_route\s*(.+)\s*\Z/) {
+				$gw_configs{'remote_all_route'} = $1;
+				next;
+			}
+			if (m/\A\s*remote_(.+)_route\s*(.+)\s*\Z/) {
+				$gw_configs{'remote_domain_route'}{$1} = $2;
+				next;
+			}
 		}
 		close $fh if $fh;
 	}
