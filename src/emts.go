@@ -1378,6 +1378,19 @@ func runGwCheck(sinfo *sjson.Json, config *inc.Config) {
 	if gwDomains, err := sinfo.Get("epinfo").Get("gw").Get("domains").Get("lst").StringArray(); err == nil {
 		checkGwDomains(gwDomains, gwAuthType)
 	}
+
+	gwAbroadProxyOn := sinfo.Get("epinfo").Get("gw").Get("configs").Get("abroad_proxy_on").MustString()
+	if gwAbroadProxyOn == "1" {
+		gwAbroadProxyIP := sinfo.Get("epinfo").Get("gw").Get("configs").Get("abroad_proxy_ip").MustString()
+		gwAbroadProxyPort := sinfo.Get("epinfo").Get("gw").Get("configs").Get("abroad_proxy_port").MustString()
+		checkGwProxyHost(gwAbroadProxyIP, gwAbroadProxyPort)
+	}
+
+	gwRemoteAllRoute := sinfo.Get("epinfo").Get("gw").Get("configs").Get("remote_all_route").MustString()
+	checkGwRemoteAllRoute(gwRemoteAllRoute)
+
+	gwRemoteDomainRoute := sinfo.Get("epinfo").Get("gw").Get("configs").Get("remote_domain_route").MustMap()
+	checkGwRemoteDomainRoute(gwRemoteDomainRoute)
 }
 
 func checkHosts() {
@@ -1495,6 +1508,56 @@ func checkGwDomains(s []string, t string) {
 	} else {
 		fmt.Printf(_succ(trans("%d Relay Domain %s Backend Service\n")),
 			len(args), strings.ToUpper(t))
+	}
+}
+
+func checkGwProxyHost(host string, port string) {
+	args := []string{host + "," + port}
+	result := inc.Caller(inc.Checker["smtp"], args)
+	warn, rest := parseCheckerOutput(result)
+	if warn > 0 {
+		fmt.Printf(_warn(trans("Aboard Proxy Server %s:%s Smtp Service Fail\n%s\n")),
+			host, port, rest)
+	} else {
+		fmt.Printf(_succ(trans("Aboard Proxy Server %s:%s Smtp Service OK\n")),
+			host, port)
+	}
+}
+
+func checkGwRemoteAllRoute(host string) {
+	if len(host) <= 0 {
+		return
+	}
+	port := "25"
+	args := []string{host + "," + port}
+	result := inc.Caller(inc.Checker["smtp"], args)
+	warn, rest := parseCheckerOutput(result)
+	if warn > 0 {
+		fmt.Printf(_warn(trans("Remote All Route Address: %s:%s Smtp Service Fail\n%s\n")),
+			host, port, rest)
+	} else {
+		fmt.Printf(_succ(trans("Remote All Route Address: %s:%s Smtp Service OK\n")),
+			host, port)
+	}
+}
+
+func checkGwRemoteDomainRoute(s map[string]interface{}) {
+	args := []string{}
+	port := "25"
+	for _, v := range s {
+		switch vv := v.(type) {
+		case string:
+			args = append(args, vv+","+port)
+		}
+	}
+	result := inc.Caller(inc.Checker["smtp"], args)
+	warn, rest := parseCheckerOutput(result)
+	if warn > 0 {
+		fmt.Printf(_warn(trans("%d/%d Remote Domain Route Smtp Service Fail\n%s\n")),
+			warn, len(args), rest)
+	} else {
+		fmt.Printf(_succ(trans("%d Remote Domain Route Smtp Service OK\n")),
+			len(args))
 	}
 }
 

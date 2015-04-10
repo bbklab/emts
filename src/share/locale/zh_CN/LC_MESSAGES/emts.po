@@ -322,5 +322,23 @@ msgstr "%d/%d 个转发域 %s 后台认证服务异常\n%s\n"
 msgid "%d Relay Domain %s Backend Service\n"
 msgstr "%d 个转发域 %s 后台认证服务正常\n"
 
+msgid "Aboard Proxy Server %s:%s Smtp Service Fail\n%s\n"
+msgstr "连接海外转发服务器 %s:%s SMTP服务失败\n%s\n"
+
+msgid "Aboard Proxy Server %s:%s Smtp Service OK\n"
+msgstr "连接海外转发服务器 %s:%s SMTP服务成功\n"
+
+msgid "Remote All Route Address: %s:%s Smtp Service Fail\n%s\n"
+msgstr "所有邮件转发路由地址 %s:%s 的SMTP服务连接失败\n%s\n"
+
+msgid "Remote All Route Address: %s:%s Smtp Service OK\n"
+msgstr "所有邮件转发路由地址 %s:%s 的SMTP服务连接成功\n"
+
+msgid "%d/%d Remote Domain Route Smtp Service Fail\n%s\n"
+msgstr "%d/%d 个域转发路由地址的SMTP服务连接失败\n%s\n"
+
+msgid "%d Remote Domain Route Smtp Service OK\n"
+msgstr "%d 个域转发路由地址的SMTP服务连接成功\n"
+
 msgid "Result: %s:%s, %s:%s, %s:%s, %s:%s, %s:%s\nScore: %d\n\n\n"
 msgstr "结果: %s:%s, %s:%s, %s:%s, %s:%s, %s:%s\n得分: %d\n\n\n"
