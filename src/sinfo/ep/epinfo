@@ -127,6 +127,7 @@ my (%common, %mail, %gw, %epush, %mail4, %archive, %result);
 # get common info
 my $exposed = undef;
 my $diskdev = undef;
+my $bjtime  = undef;
 if (-f $emauto && -x $emauto) {
 	my $fh;
 	open $fh, "$emauto exposed 2>&- |";
@@ -140,6 +141,13 @@ if (-f $emauto && -x $emauto) {
 	if ($fh) {
 		while (<$fh>) {
 			chomp; $diskdev = $_;
+			last;
+		}
+	}
+	open $fh, "$emauto bjtime 2>&- |";
+	if ($fh) {
+		while (<$fh>) {
+			chomp; $bjtime = $_;
 			last;
 		}
 	}
@@ -553,6 +561,7 @@ if (-f $mail4_scriptd) {
 %common = (
 	'exposed'		=> $exposed,
 	'diskdev'		=> $diskdev,
+	'bjtime'		=> $bjtime,
 );
 
 %mail = (

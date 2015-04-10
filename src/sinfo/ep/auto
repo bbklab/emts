@@ -157,7 +157,7 @@ ARRAY_EMCOMP_SPECIAL=(
 # Show Help
 show_usage() {
 cat << EOF
-        ${0##*/}	help | emversion | exposed | process | diskdev
+        ${0##*/}	help | emversion | exposed | bjtime | process | diskdev
         ${0##*/}	smtpaddr | popaddr | imapaddr | httpaddr
         ${0##*/}	mysqladdr | memcacheaddr | mproxyaddr | gearmanaddr 
 EOF
@@ -863,6 +863,20 @@ get_exposed_addr() {
 	fi
 }
 
+get_bjtime() {
+	local cfg_value=
+	local timeurl="http://esop.eyou.net/esop.time"
+	local bjtime=$( /usr/bin/curl -s --max-time 3 --max-redirs 3 ${timeurl} 2>&- )
+	if [ -n "${bjtime}" ]; then
+		if is_int "${bjtime}" >/dev/null 2>&1 ; then
+			cfg_value="${bjtime}"
+		fi
+	fi
+	if [ ! -z "${cfg_value}" ]; then
+		echo -e "${cfg_value}"
+	fi
+}
+
 get_mysql_svraddr() {
 	comps=( mysql mysql_index mysql_log )
 	get_listen_addr ${comps[*]}
@@ -907,6 +921,8 @@ case "${1}" in
 	echo ${EM_VERSION} 	;;
 "exposed")
 	get_exposed_addr	;;
+"bjtime")
+	get_bjtime		;;
 "mysqladdr")
 	get_mysql_svraddr	;;
 "mproxyaddr")
