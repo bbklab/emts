@@ -1550,6 +1550,9 @@ func checkGwRemoteDomainRoute(s map[string]interface{}) {
 			args = append(args, vv+","+port)
 		}
 	}
+	if len(args) <= 0 {
+		return
+	}
 	result := inc.Caller(inc.Checker["smtp"], args)
 	warn, rest := parseCheckerOutput(result)
 	if warn > 0 {
