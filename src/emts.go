@@ -1368,6 +1368,16 @@ func runGwCheck(sinfo *sjson.Json, config *inc.Config) {
 
 	gwLicense := sinfo.Get("epinfo").Get("gw").Get("license").MustMap()
 	checkGwLicense(gwLicense, config.GwLicense)
+
+	gwRemoteMe := sinfo.Get("epinfo").Get("gw").Get("configs").Get("me").MustString()
+	checkGwRemoteMe(gwRemoteMe)
+
+	gwAuthType := sinfo.Get("epinfo").Get("gw").Get("configs").Get("auth_type").MustString()
+	checkGwAuthType(gwAuthType)
+
+	if gwDomains, err := sinfo.Get("epinfo").Get("gw").Get("domains").Get("lst").StringArray(); err == nil {
+		checkGwDomains(gwDomains, gwAuthType)
+	}
 }
 
 func checkHosts() {
@@ -1394,11 +1404,9 @@ func checkGwVersion(s string) {
 	version := string([]byte(s)[0:3])
 	if ver, err := strconv.ParseFloat(version, 64); err == nil {
 		if ver < 4.1 {
-			fmt.Printf(_note(trans("Better to Upgrade Nower Gw Version %s\n")),
-				s)
+			fmt.Printf(_note(trans("Better to Upgrade Nower Gw Version %s\n")), s)
 		} else {
-			fmt.Printf(_succ(trans("Nower Gw Vesion: %s\n")),
-				s)
+			fmt.Printf(_succ(trans("Nower Gw Vesion: %s\n")), s)
 		}
 	}
 }
@@ -1421,8 +1429,7 @@ func checkGwLicense(s map[string]interface{}, c *inc.GwLicense) {
 	}
 	switch v := s["max_child"].(type) {
 	case string:
-		details += fmt.Sprintf(trans("Max Child: %s, "),
-			v)
+		details += fmt.Sprintf(trans("Max Child: %s, "), v)
 	}
 	switch v := s["expire_date"].(type) {
 	case string:
@@ -1442,6 +1449,53 @@ func checkGwLicense(s map[string]interface{}, c *inc.GwLicense) {
 		return
 	}
 	fmt.Println(_succ(details))
+}
+
+func checkGwAuthType(s string) {
+	if s != "smtp" {
+		fmt.Printf(_atte(trans("Gw_Smtp Backend Auth Type is: %s\n")), s)
+	} else {
+		fmt.Printf(_succ(trans("Gw_Smtp Backend Auth Type is: %s\n")), s)
+	}
+}
+
+func checkGwRemoteMe(s string) {
+	if len(s) > 0 {
+		if s == "eyou.net" {
+			fmt.Printf(_note(trans("Gw_Remote Helo is: %s\n")), s)
+		} else {
+			fmt.Printf(_succ(trans("Gw_Remote Helo is: %s\n")), s)
+		}
+	} else {
+		fmt.Printf(_warn(trans("Gw_Remote Helo is Empty\n")), s)
+	}
+}
+
+func checkGwDomains(s []string, t string) {
+	args := []string{}
+	for _, v := range s {
+		vv := strings.SplitN(v, " ", -1)
+		if len(vv) >= 2 {
+			args = append(args, strings.Replace(vv[1], ":", ",", -1))
+		}
+	}
+	var result string
+	switch t {
+	case "smtp":
+		result = inc.Caller(inc.Checker["smtp"], args)
+	case "pop3":
+		result = inc.Caller(inc.Checker["pop"], args)
+	default:
+		return
+	}
+	warn, rest := parseCheckerOutput(result)
+	if warn > 0 {
+		fmt.Printf(_warn(trans("%d/%d Relay Domain %s Backend Service Fail\n%s\n")),
+			warn, len(args), strings.ToUpper(t), rest)
+	} else {
+		fmt.Printf(_succ(trans("%d Relay Domain %s Backend Service\n")),
+			len(args), strings.ToUpper(t))
+	}
 }
 
 func parseCheckerOutput(s string) (int, string) {

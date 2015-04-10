@@ -307,5 +307,20 @@ msgstr "最大用户数: %s, "
 msgid "Gw System License Remain Day %d\n\t%s\n"
 msgstr "网关许可证剩余使用天数: %d\n\t%s\n"
 
+msgid "Gw_Smtp Backend Auth Type is: %s\n"
+msgstr "网关SMTP后台认证类型为: %s\n"
+
+msgid "Gw_Remote Helo is: %s\n"
+msgstr "网关SMTP投递的HELO为: %s\n"
+
+msgid "Gw_Remote Helo is Empty\n"
+msgstr "网关SMTP投递的HELO为空\n"
+
+msgid "%d/%d Relay Domain %s Backend Service Fail\n%s\n"
+msgstr "%d/%d 个转发域 %s 后台认证服务异常\n%s\n"
+
+msgid "%d Relay Domain %s Backend Service\n"
+msgstr "%d 个转发域 %s 后台认证服务正常\n"
+
 msgid "Result: %s:%s, %s:%s, %s:%s, %s:%s, %s:%s\nScore: %d\n\n\n"
 msgstr "结果: %s:%s, %s:%s, %s:%s, %s:%s, %s:%s\n得分: %d\n\n\n"
