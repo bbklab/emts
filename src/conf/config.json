@@ -20,6 +20,7 @@
   },
   "ExposedIP":      [
   ],
+  "BJTimeOffset":   1800,
   "GMQueueLimit":   100,
   "QueueLimit":     300,
   "MailLicense":    {

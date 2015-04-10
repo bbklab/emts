@@ -20,6 +20,7 @@ type Config struct {
 	CpuUsage       float64
 	DiskUsage      *DiskUsage
 	ExposedIP      []string
+	BJTimeOffset   int64
 	GMQueueLimit   int64
 	QueueLimit     int64
 	MailLicense    *MailLicense

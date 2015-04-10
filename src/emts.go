@@ -184,6 +184,9 @@ func process(sinfo *sjson.Json, config *inc.Config) {
 	exposedAddr := sinfo.Get("epinfo").Get("common").Get("exposed").MustString()
 	checkDnsbl(exposedAddr, config.ExposedIP)
 
+	bjTime := sinfo.Get("epinfo").Get("common").Get("bjtime").MustString()
+	checkBJTime(bjTime, config.BJTimeOffset)
+
 	/*
 		begin eyou mail related check
 	*/
@@ -639,6 +642,29 @@ func checkDnsbl(s string, cs []string) {
 		if len(rest) > 0 {
 			fmt.Printf(_succ(trans("%d Exposed IPAddress NOT Listed in DNSBL\n")),
 				len(ips))
+		}
+	}
+}
+
+func checkBJTime(s string, limit int64) {
+	if len(s) <= 0 {
+		return
+	}
+	if n, err := strconv.ParseInt(s, 10, 64); err == nil {
+		now := time.Now().Unix()
+		offset := now - n
+		var noffset int64
+		if offset < 0 {
+			noffset = -offset
+		} else {
+			noffset = offset
+		}
+		if noffset >= limit {
+			fmt.Printf(_warn(trans("Local Time Step Offset %d seconds\n")),
+				offset)
+		} else {
+			fmt.Printf(_succ(trans("Local Time Step Offset %d seconds\n")),
+				offset)
 		}
 	}
 }

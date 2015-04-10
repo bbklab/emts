@@ -340,5 +340,8 @@ msgstr "%d/%d 个域转发路由地址的SMTP服务连接失败\n%s\n"
 msgid "%d Remote Domain Route Smtp Service OK\n"
 msgstr "%d 个域转发路由地址的SMTP服务连接成功\n"
 
+msgid "Local Time Step Offset %d seconds\n"
+msgstr "本地时间和标准时间相差 %d 秒\n"
+
 msgid "Result: %s:%s, %s:%s, %s:%s, %s:%s, %s:%s\nScore: %d\n\n\n"
 msgstr "结果: %s:%s, %s:%s, %s:%s, %s:%s, %s:%s\n得分: %d\n\n\n"
