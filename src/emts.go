@@ -660,7 +660,7 @@ func checkBJTime(s string, limit int64) {
 			noffset = offset
 		}
 		if noffset >= limit {
-			fmt.Printf(_warn(trans("Local Time Step Offset %d seconds\n")),
+			fmt.Printf(_note(trans("Local Time Step Offset %d seconds\n")),
 				offset)
 		} else {
 			fmt.Printf(_succ(trans("Local Time Step Offset %d seconds\n")),
