@@ -397,13 +397,14 @@ if (-f $gw_eyouunid && -x $gw_eyouunid) {
 	}
 }
 
-# get gw_domainsum
-my $gw_domainsum = undef;
+# get gw_domains
+my %gw_domains = ();
 my $gw_domainconf = EYOUGATE_INST . '/etc/domain.conf';
 if (-f $gw_domainconf) {
 	if (open my $fh, "<$gw_domainconf") {
-		my @gw_domains = <$fh>;
-		$gw_domainsum = scalar @gw_domains;
+		my @domains = <$fh>;
+		$gw_domains{'sum'} = scalar @domains;
+		$gw_domains{'lst'} = [ map { s/[\r\n]//g; $_ } @domains ];	# use anon array
 		close $fh if $fh;
 	}
 }
@@ -459,6 +460,34 @@ if (-f $gw_mysqlcli && -x $gw_mysqlcli) {
 	}
 }
 
+# get gw_configs
+my %gw_configs = ();
+my $gw_mailconf = '/var/emdg/etc/mail.conf';
+if (-f $gw_mailconf && -r $gw_mailconf) {
+	if (open my $fh, "<", $gw_mailconf) {
+		while (<$fh>) {
+			chomp;
+			next if (m/\A\s*#/ || m/\A\s*;/ || m/\A\s*\Z/);
+			if (m/\A\s*me\s*(.+)\s*\Z/) {
+				$gw_configs{'me'} = $1;
+				next;
+			}
+			if (m/\A\s*spf_level\s*(.+)\s*\Z/) {
+				$gw_configs{'spf_level'} = $1;
+				next;
+			}
+			if (m/\A\s*auth_type\s*(.+)\s*\Z/) {
+				$gw_configs{'auth_type'} = $1;
+				next;
+			}
+			if (m/\A\s*product_type\s*(.+)\s*\Z/) {
+				$gw_configs{'product_type'} = $1;
+				next;
+			}
+		}
+		close $fh if $fh;
+	}
+}
 
 
 # get epush version
@@ -521,8 +550,9 @@ if (-f $mail4_scriptd) {
 	'is_installed'		=> $ep_exists{'gw'},
 	'version'		=> $gw_version,
 	'serial'		=> $gw_serial,
-	'domains'		=> $gw_domainsum,
+	'domains'		=> \%gw_domains,
 	'license'		=> \%gw_license,
+	'configs'		=> \%gw_configs,
 );
 
 %epush = (
