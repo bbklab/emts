@@ -464,54 +464,63 @@ get_emcompinfo() {
 		elif [ "${comp}" == "memcache_session"	]; then
 			local listen_addr=$(read_conf "${EM_INIT_CONFIG}" "MEMCACHE_SESSION_LISTEN" "=")
 			local listen_port=$(read_conf "${EM_INIT_CONFIG}" "MEMCACHE_SESSION_PORT" "=")
+			[ -z "${listen_addr}" ] && listen_addr="0.0.0.0"
 			if [ -n "${listen_addr}" ] && [ -n "${listen_port}" ]; then
 				bind_addr="${listen_addr}:${listen_port}"
 			fi
 		elif [ "${comp}" == "memcache_fix"	]; then
 			local listen_addr=$(read_conf "${EM_INIT_CONFIG}" "MEMCACHE_FIX_LISTEN" "=")
 			local listen_port=$(read_conf "${EM_INIT_CONFIG}" "MEMCACHE_FIX_PORT" "=")
+			[ -z "${listen_addr}" ] && listen_addr="0.0.0.0"
 			if [ -n "${listen_addr}" ] && [ -n "${listen_port}" ]; then
 				bind_addr="${listen_addr}:${listen_port}"
 			fi
 		elif [ "${comp}" == "memcache_hot"	]; then
 			local listen_addr=$(read_conf "${EM_INIT_CONFIG}" "MEMCACHE_HOT_LISTEN" "=")
 			local listen_port=$(read_conf "${EM_INIT_CONFIG}" "MEMCACHE_HOT_PORT" "=")
+			[ -z "${listen_addr}" ] && listen_addr="0.0.0.0"
 			if [ -n "${listen_addr}" ] && [ -n "${listen_port}" ]; then
 				bind_addr="${listen_addr}:${listen_port}"
 			fi
 		elif [ "${comp}" == "memcache_config"	]; then
 			local listen_addr=$(read_conf "${EM_INIT_CONFIG}" "MEMCACHE_CONFIG_LISTEN" "=")
 			local listen_port=$(read_conf "${EM_INIT_CONFIG}" "MEMCACHE_CONFIG_PORT" "=")
+			[ -z "${listen_addr}" ] && listen_addr="0.0.0.0"
 			if [ -n "${listen_addr}" ] && [ -n "${listen_port}" ]; then
 				bind_addr="${listen_addr}:${listen_port}"
 			fi
 		elif [ "${comp}" == "memcache_db"	]; then
 			local listen_addr=$(read_conf "${EM_INIT_CONFIG}" "MEMCACHE_DB_LISTEN" "=")
 			local listen_port=$(read_conf "${EM_INIT_CONFIG}" "MEMCACHE_DB_PORT" "=")
+			[ -z "${listen_addr}" ] && listen_addr="0.0.0.0"
 			if [ -n "${listen_addr}" ] && [ -n "${listen_port}" ]; then
 				bind_addr="${listen_addr}:${listen_port}"
 			fi
 		elif [ "${comp}" == "memcache_fastdb"	]; then
 			local listen_addr=$(read_conf "${EM_INIT_CONFIG}" "MEMCACHE_FASTDB_LISTEN" "=")
 			local listen_port=$(read_conf "${EM_INIT_CONFIG}" "MEMCACHE_FASTDB_PORT" "=")
+			[ -z "${listen_addr}" ] && listen_addr="0.0.0.0"
 			if [ -n "${listen_addr}" ] && [ -n "${listen_port}" ]; then
 				bind_addr="${listen_addr}:${listen_port}"
 			fi
 		elif [ "${comp}" == "gearman"		]; then
 			local listen_addr=$(read_conf "${EM_INIT_CONFIG}" "GEARMAN_LISTEN" "=")
 			local listen_port=$(read_conf "${EM_INIT_CONFIG}" "GEARMAN_PORT" "=")
+			[ -z "${listen_addr}" ] && listen_addr="0.0.0.0"
 			if [ -n "${listen_addr}" ] && [ -n "${listen_port}" ]; then
 				bind_addr="${listen_addr}:${listen_port}"
 			fi
 		elif [ "${comp}" == "gearman_mta"	]; then
 			local listen_addr=$(read_conf "${EM_INIT_CONFIG}" "GEARMAN_MTA_LISTEN" "=")
 			local listen_port=$(read_conf "${EM_INIT_CONFIG}" "GEARMAN_MTA_PORT" "=")
+			[ -z "${listen_addr}" ] && listen_addr="0.0.0.0"
 			if [ -n "${listen_addr}" ] && [ -n "${listen_port}" ]; then
 				bind_addr="${listen_addr}:${listen_port}"
 			fi
 		elif [ "${comp}" == "gearman_php"	]; then
 			local listen_addr=$(read_conf "${EM_INIT_CONFIG}" "GEARMAN_PHP_LISTEN" "=")
 			local listen_port=$(read_conf "${EM_INIT_CONFIG}" "GEARMAN_PHP_PORT" "=")
+			[ -z "${listen_addr}" ] && listen_addr="0.0.0.0"
 			if [ -n "${listen_addr}" ] && [ -n "${listen_port}" ]; then
 				bind_addr="${listen_addr}:${listen_port}"
 			fi
