@@ -1386,6 +1386,11 @@ func checkMailMysqlRepl() {
 }
 
 func runGwCheck(sinfo *sjson.Json, config *inc.Config) {
+
+	if sysStartups, err := sinfo.Get("startups").StringArray(); err == nil {
+		checkGwStartups(sysStartups, []string{"gw_init"})
+	}
+
 	checkHosts()
 	checkCronJob()
 
@@ -1417,6 +1422,37 @@ func runGwCheck(sinfo *sjson.Json, config *inc.Config) {
 
 	gwRemoteDomainRoute := sinfo.Get("epinfo").Get("gw").Get("configs").Get("remote_domain_route").MustMap()
 	checkGwRemoteDomainRoute(gwRemoteDomainRoute)
+}
+
+func checkGwStartups(ss []string, must []string) {
+	lost := make([]string, 0)
+	for _, v := range must {
+		isLost := true
+		for _, s := range ss {
+			if v == s {
+				isLost = false
+				break
+			}
+		}
+		if isLost {
+			lost = append(lost, v)
+		}
+	}
+	n := len(lost)
+	if n > 0 {
+		reg := regexp.MustCompilePOSIX("gw_init[ \t]*start[ \t]*$")
+		file := "/etc/rc.local"
+		if inc.FGrepBool(file, reg) {
+			fmt.Printf(_succ(trans("%d eYou Product as System Startups Ready\n")),
+				1)
+		} else {
+			fmt.Printf(_warn(trans("Lost %d eYou Product as System Startups: %v\n")),
+				1, "gw_init")
+		}
+	} else {
+		fmt.Printf(_succ(trans("%d eYou Product as System Startups Ready\n")),
+			len(must))
+	}
 }
 
 func checkHosts() {
