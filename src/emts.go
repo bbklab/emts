@@ -1453,6 +1453,12 @@ func checkGwVersion(s string) {
 func checkGwLicense(s map[string]interface{}, c *inc.GwLicense) {
 	var remainDay int64
 	var details string
+
+	// exit if map s doesn't have key: expire_date
+	if _, ok := s["expire_date"]; !ok {
+		return
+	}
+
 	switch v := s["license_type"].(type) {
 	case string:
 		switch v {
