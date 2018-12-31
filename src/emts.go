@@ -151,27 +151,29 @@ func process(sinfo *sjson.Json, config *inc.Config) {
 	go checkDiskFsio(c, diskFsio)
 	n++
 
-	isTimeout := make(chan bool, 1)
-	go func() {
-		time.Sleep(30 * time.Second)
-		isTimeout <- true
-	}()
+	/*
+		isTimeout := make(chan bool, 1)
+		go func() {
+			time.Sleep(30 * time.Second)
+			isTimeout <- true
+		}()
+	*/
 
 	i := 0
 	for {
-		select {
-		case s := <-c:
-			i++
-			if len(s) > 0 {
-				fmt.Println(s)
-			}
-			if i >= n { // all job finished
-				break
-			}
-		case <-isTimeout:
-			fmt.Println("JobTimOut")
+		s := <-c
+		i++
+		if len(s) > 0 {
+			fmt.Println(s)
+		}
+		if i >= n { // all job finished
 			break
 		}
+		/*
+			case <-isTimeout:
+				fmt.Println("JobTimOut")
+				break
+		*/
 	}
 
 	/* Following using inc.Caller to run other command
@@ -918,10 +920,16 @@ func checkMailLicense(s map[string]interface{}, c *inc.MailLicense) {
 
 	var allowSum int64
 	var endDay string
-	switch v := s["is_over"].(type) {
-	case int:
-		if v == 1 {
-			isOver = true
+	var licenseType string
+
+	switch v := s["is_over"].(type) { // type is: json.Number
+	default:
+		// fmt.Printf("is_over: %d\n", v) // try to know it's real type
+		vv := fmt.Sprintf("%s", v) // convert json.Number -> str -> int
+		if vi, err := strconv.Atoi(vv); err == nil {
+			if vi == 1 {
+				isOver = true
+			}
 		}
 	}
 	switch v := s["user_num"].(type) {
@@ -930,44 +938,53 @@ func checkMailLicense(s map[string]interface{}, c *inc.MailLicense) {
 			allowSum = n
 		}
 	}
-	switch v := s["remain_acct_num"].(type) {
-	case string:
-		if n, err := strconv.ParseInt(v, 10, 64); err == nil {
-			remainSum = n
+	switch v := s["remain_acct_num"].(type) { // json.Number
+	default:
+		// fmt.Printf("default: remain_acct_num: %d\n", v) // detect it's real type
+		vv := fmt.Sprintf("%s", v) // convert json.Number -> str -> int
+		if vi, err := strconv.ParseInt(vv, 10, 64); err == nil {
+			remainSum = vi
 		}
 	}
 	switch v := s["end_time"].(type) {
 	case string:
 		endDay = v
 	}
+	switch v := s["type"].(type) {
+	case string:
+		licenseType = v
+	}
 
 	if isOver {
-		fmt.Printf(_crit(trans("Mail System License is Over!")))
+		fmt.Printf(_crit(trans("Mail System License is Over! [%s]\n")),
+			licenseType)
 		return
 	}
 	if remainSum <= c.RemainSum {
-		fmt.Printf(_warn(trans("Mail System License Remain Users Sum %d")),
+		fmt.Printf(_note(trans("Mail System License Remain Users Sum %d\n")),
 			remainSum)
 		return
 	}
 	if remainSum > 0 {
 		remainRate = float64(100 * remainSum / allowSum)
 		if remainRate <= c.RemainRate {
-			fmt.Printf(_warn(trans("Mail System License Remain Users Rate %f")),
-				remainRate)
+			fmt.Printf(_note(trans("Mail System License Remain Users Rate %0.2f%s\n")),
+				remainRate, "%")
 			return
 		}
 	}
-	if t, err := time.Parse("2013/2/3", endDay); err == nil {
+	if t, err := time.Parse("2006/01/02", endDay); err == nil {
 		temp := t.Sub(time.Now())
-		remainDay = int64(temp.Seconds() / 3600 * 24)
+		remainDay = int64(temp.Seconds() / 3600 / 24)
 		if remainDay <= c.RemainDay {
-			fmt.Printf(_warn(trans("Mail System License Remain Day %d")),
+			fmt.Printf(_warn(trans("Mail System License Remain Day %d\n")),
 				remainDay)
 			return
 		}
 	}
 
+	fmt.Printf(_succ(trans("LicenseType: %s, RemainUser: %d(%0.2f%s), RemainDay: %d\n")),
+		licenseType, remainSum, remainRate, "%", remainDay)
 }
 
 func checkMailGMSvr(mysqlcli string, userdb map[string]interface{}, limit int64) {
